@@ -3,6 +3,7 @@ Complete BHYT ETL Pipeline với luồng:
 Load -> Validate -> Transform -> Verify -> Output JSON
 """
 
+import tempfile
 from airflow import DAG
 from airflow.operators.python import PythonOperator
 # from airflow.providers.amazon.aws.hooks.sqs import SqsHook
@@ -653,15 +654,15 @@ def task_verify_external_system(**context):
 
 
 # ============================================
-# TASK 5: OUTPUT JSON - Generate Final JSON
+# TASK 5: OUTPUT JSON - Generate và Send to API
 # ============================================
 
 def task_output_json(**context):
     """
-    TASK 5: Generate final JSON output và lưu vào destination
+    TASK 5: Generate final JSON output và gửi đến API endpoint
     
     Input: Complete DTO + Verification Results
-    Output: Final JSON file
+    Output: Final JSON file và API response
     """
     logger = logging.getLogger(__name__)
     ti = context['task_instance']
@@ -750,63 +751,86 @@ def task_output_json(**context):
         ma_lk = dto.get('tonghop', {}).get('MA_LK', 'unknown')
         output_filename = f"bhyt_{ma_lk}_{context['execution_date'].strftime('%Y%m%d_%H%M%S')}.json"
         output_path = f"/tmp/{output_filename}"
-        
+        temp_dir = tempfile.gettempdir()
+        output_path = os.path.join(temp_dir, output_filename)
         with open(output_path, 'w', encoding='utf-8') as f:
-            f.write(json_string)
+            json.dump(dto, f, ensure_ascii=False, indent=2)
+        # with open(output_path, 'w', encoding='utf-8') as f:
+        #     f.write(json_string)
         
         logger.info(f"JSON saved to: {output_path}")
         
-        # Step 5: Upload JSON to S3 output bucket
-        logger.info("Step 5: Uploading JSON to S3 output bucket...")
+        # Step 5: Send JSON to API endpoint
+        logger.info("Step 5: Sending JSON to API endpoint...")
         
-        import boto3
+        api_endpoint = Variable.get('bhyt_api_endpoint', 'https://localhost:44315/api/app/files/test')
         
-        s3_client = boto3.client('s3',
-            aws_access_key_id=Variable.get('aws_access_key_id', default_var=None),
-            aws_secret_access_key=Variable.get('aws_secret_access_key', default_var=None),
-            region_name=Variable.get('aws_region', default_var='ap-southeast-1')
+        api_response = send_json_to_api(
+            endpoint_url=api_endpoint,
+            json_data=json_string,
+            ma_lk=ma_lk,
+            logger=logger
         )
-        
-        output_bucket = Variable.get('bhyt_output_bucket', 'bhyt-processed-json')
-        output_key = f"processed/{context['execution_date'].strftime('%Y/%m/%d')}/{output_filename}"
-        
-        s3_client.upload_file(
-            output_path,
-            output_bucket,
-            output_key,
-            ExtraArgs={
-                'ContentType': 'application/json',
-                'Metadata': {
-                    'ma_lk': ma_lk,
-                    'processing_date': context['execution_date'].isoformat(),
-                    'pipeline_version': '2.0.0'
-                }
-            }
-        )
-        
-        output_s3_uri = f"s3://{output_bucket}/{output_key}"
-        logger.info(f"JSON uploaded to: {output_s3_uri}")
-        
-        # Step 6: Call external API to save data (optional)
-        logger.info("Step 6: Calling external API to save data...")
-        
-        api_response = call_external_api_to_save(final_json, ma_lk)
         
         logger.info(f"API call status: {api_response['status']}")
+        logger.info(f"API response code: {api_response['status_code']}")
+        
+        if api_response['status'] != 'success':
+            logger.warning(f"API call failed: {api_response.get('error_message')}")
+        
+        # Step 6: Upload JSON to S3 output bucket (backup)
+        logger.info("Step 6: Uploading JSON to S3 output bucket (backup)...")
+        
+        try:
+            import boto3
+            
+            s3_client = boto3.client('s3',
+                aws_access_key_id=Variable.get('aws_access_key_id', default_var=None),
+                aws_secret_access_key=Variable.get('aws_secret_access_key', default_var=None),
+                region_name=Variable.get('aws_region', default_var='ap-southeast-1')
+            )
+            
+            output_bucket = Variable.get('bhyt_output_bucket', 'bhyt-processed-json')
+            output_key = f"processed/{context['execution_date'].strftime('%Y/%m/%d')}/{output_filename}"
+            
+            s3_client.upload_file(
+                output_path,
+                output_bucket,
+                output_key,
+                ExtraArgs={
+                    'ContentType': 'application/json',
+                    'Metadata': {
+                        'ma_lk': ma_lk,
+                        'processing_date': context['execution_date'].isoformat(),
+                        'pipeline_version': '2.0.0',
+                        'api_status': api_response['status']
+                    }
+                }
+            )
+            
+            output_s3_uri = f"s3://{output_bucket}/{output_key}"
+            logger.info(f"JSON uploaded to S3: {output_s3_uri}")
+            
+        except Exception as s3_error:
+            logger.warning(f"S3 upload failed (non-critical): {str(s3_error)}")
+            output_s3_uri = None
         
         # Step 7: Delete message from SQS (processing completed)
         logger.info("Step 7: Deleting message from SQS queue...")
         
-        receipt_handle = file_metadata.get('sqs_receipt_handle')
+        # receipt_handle = file_metadata.get('sqs_receipt_handle')
         # if receipt_handle:
-        #     sqs_hook = SqsHook(aws_conn_id='aws_default')
-        #     queue_url = Variable.get('bhyt_sqs_queue_url')
-            
-        #     sqs_hook.delete_message(
-        #         queue_url=queue_url,
-        #         receipt_handle=receipt_handle
-        #     )
-        #     logger.info("SQS message deleted successfully")
+        #     try:
+        #         sqs_hook = SqsHook(aws_conn_id='aws_default')
+        #         queue_url = Variable.get('bhyt_sqs_queue_url')
+                
+        #         sqs_hook.delete_message(
+        #             queue_url=queue_url,
+        #             receipt_handle=receipt_handle
+        #         )
+        #         logger.info("SQS message deleted successfully")
+        #     except Exception as sqs_error:
+        #         logger.warning(f"Failed to delete SQS message: {str(sqs_error)}")
         
         # Step 8: Push final results to XCom
         logger.info("Step 8: Pushing final results to XCom...")
@@ -814,22 +838,29 @@ def task_output_json(**context):
         final_results = {
             'output_s3_uri': output_s3_uri,
             'output_filename': output_filename,
+            'output_local_path': output_path,
             'json_size': json_size,
             'ma_lk': ma_lk,
             'processing_status': final_json['processing_status']['overall_status'],
             'api_response': api_response,
+            'api_endpoint': api_endpoint,
             'completed_at': datetime.utcnow().isoformat()
         }
         
         ti.xcom_push(key='final_results', value=final_results)
         
         # Clean up temp file
-        os.remove(output_path)
+        try:
+            os.remove(output_path)
+            logger.info(f"Cleaned up temporary file: {output_path}")
+        except Exception as e:
+            logger.warning(f"Failed to clean up temp file: {str(e)}")
         
         logger.info("=" * 80)
         logger.info("TASK 5: OUTPUT JSON - Completed successfully")
-        logger.info(f"Output: {output_s3_uri}")
-        logger.info(f"Status: {final_json['processing_status']['overall_status']}")
+        logger.info(f"Output S3: {output_s3_uri}")
+        logger.info(f"API Status: {api_response['status']}")
+        logger.info(f"Processing Status: {final_json['processing_status']['overall_status']}")
         logger.info(f"MA_LK: {ma_lk}")
         logger.info("=" * 80)
         
@@ -839,6 +870,245 @@ def task_output_json(**context):
         logger.error(f"TASK 5: OUTPUT JSON - Failed with error: {str(e)}")
         logger.exception(e)
         raise
+
+
+# ============================================
+# API Helper Functions
+# ============================================
+
+def send_json_to_api(endpoint_url: str, json_data: str, ma_lk: str, logger) -> dict:
+    """
+    Send JSON data to ASP.NET Core API endpoint
+    
+    Args:
+        endpoint_url: API endpoint URL (e.g., https://localhost:44315/api/app/files/test)
+        json_data: JSON string to send
+        ma_lk: MA_LK for tracking
+        logger: Logger instance
+        
+    Returns:
+        dict with status, status_code, response_data, error_message
+    """
+    import requests
+    import urllib3
+    from requests.adapters import HTTPAdapter
+    from urllib3.util.retry import Retry
+    
+    logger.info(f"Preparing to send JSON to API: {endpoint_url}")
+    logger.info(f"JSON size: {len(json_data)} bytes")
+    logger.info(f"MA_LK: {ma_lk}")
+    
+    # Disable SSL warnings for localhost (development only)
+    urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+    
+    # Setup retry strategy
+    retry_strategy = Retry(
+        total=3,
+        backoff_factor=2,
+        status_forcelist=[429, 500, 502, 503, 504],
+        allowed_methods=["POST"]
+    )
+    
+    adapter = HTTPAdapter(max_retries=retry_strategy)
+    session = requests.Session()
+    session.mount("http://", adapter)
+    session.mount("https://", adapter)
+    
+    # Prepare request
+    headers = {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+        'User-Agent': 'Airflow-BHYT-ETL/2.0',
+        'X-MA-LK': ma_lk,
+        'X-Request-ID': f"req_{int(datetime.utcnow().timestamp())}_{ma_lk}"
+    }
+    
+    # Prepare payload - API endpoint expects parameter "xml" with JSON string value
+    # For ASP.NET Core, we can send as form data or JSON body
+    
+    # Option 1: Send as form data (recommended for string parameter)
+    payload = {
+        'xml': json_data
+    }
+    
+    logger.info("Sending request to API...")
+    logger.info(f"Headers: {json.dumps({k: v for k, v in headers.items() if k != 'Authorization'}, indent=2)}")
+    
+    max_retries = 3
+    retry_count = 0
+    last_error = None
+    
+    while retry_count < max_retries:
+        try:
+            # Make POST request
+            response = session.post(
+                endpoint_url,
+                data=payload,  # Send as form data
+                headers=headers,
+                timeout=60,  # 60 seconds timeout
+                verify=False  # Skip SSL verification for localhost (DEVELOPMENT ONLY!)
+            )
+            
+            logger.info(f"API Response Status: {response.status_code}")
+            logger.info(f"API Response Headers: {dict(response.headers)}")
+            
+            # Log response body (first 500 chars)
+            response_text = response.text[:500] if response.text else ''
+            logger.info(f"API Response Body (preview): {response_text}")
+            
+            # Check if request was successful
+            if response.status_code in [200, 201, 202]:
+                logger.info(f"✓ API call successful (status {response.status_code})")
+                
+                # Try to parse JSON response
+                try:
+                    response_data = response.json()
+                except:
+                    response_data = {'raw_response': response.text}
+                
+                return {
+                    'status': 'success',
+                    'status_code': response.status_code,
+                    'response_data': response_data,
+                    'response_text': response.text,
+                    'request_id': headers.get('X-Request-ID'),
+                    'retry_count': retry_count,
+                    'timestamp': datetime.utcnow().isoformat()
+                }
+            
+            elif response.status_code in [400, 422]:
+                # Client error - don't retry
+                logger.error(f"✗ API call failed with client error {response.status_code}")
+                logger.error(f"Response: {response.text}")
+                
+                return {
+                    'status': 'failed',
+                    'status_code': response.status_code,
+                    'error_message': f"Client error: {response.text}",
+                    'response_text': response.text,
+                    'retry_count': retry_count,
+                    'timestamp': datetime.utcnow().isoformat()
+                }
+            
+            elif response.status_code in [500, 502, 503, 504]:
+                # Server error - retry
+                logger.warning(f"⚠ API call failed with server error {response.status_code}, retrying...")
+                last_error = f"Server error {response.status_code}: {response.text}"
+                retry_count += 1
+                
+                if retry_count < max_retries:
+                    import time
+                    wait_time = 2 ** retry_count  # Exponential backoff
+                    logger.info(f"Waiting {wait_time} seconds before retry {retry_count + 1}/{max_retries}...")
+                    time.sleep(wait_time)
+                    continue
+            
+            else:
+                # Other errors
+                logger.error(f"✗ API call failed with status {response.status_code}")
+                logger.error(f"Response: {response.text}")
+                
+                return {
+                    'status': 'failed',
+                    'status_code': response.status_code,
+                    'error_message': f"Unexpected status code: {response.text}",
+                    'response_text': response.text,
+                    'retry_count': retry_count,
+                    'timestamp': datetime.utcnow().isoformat()
+                }
+                
+        except requests.exceptions.Timeout as e:
+            logger.error(f"✗ API call timeout (attempt {retry_count + 1}/{max_retries})")
+            last_error = f"Timeout: {str(e)}"
+            retry_count += 1
+            
+            if retry_count < max_retries:
+                import time
+                time.sleep(2 ** retry_count)
+                continue
+        
+        except requests.exceptions.ConnectionError as e:
+            logger.error(f"✗ Connection error (attempt {retry_count + 1}/{max_retries}): {str(e)}")
+            last_error = f"Connection error: {str(e)}"
+            retry_count += 1
+            
+            if retry_count < max_retries:
+                import time
+                time.sleep(2 ** retry_count)
+                continue
+        
+        except Exception as e:
+            logger.error(f"✗ Unexpected error during API call: {str(e)}")
+            logger.exception(e)
+            last_error = str(e)
+            break
+    
+    # All retries failed
+    logger.error(f"✗ API call failed after {max_retries} retries")
+    
+    return {
+        'status': 'failed',
+        'status_code': 0,
+        'error_message': f"Failed after {max_retries} retries. Last error: {last_error}",
+        'retry_count': retry_count,
+        'timestamp': datetime.utcnow().isoformat()
+    }
+
+
+def send_json_to_api_alternative(endpoint_url: str, json_data: str, ma_lk: str, logger) -> dict:
+    """
+    Alternative method: Send JSON in request body với Content-Type application/json
+    Nếu API endpoint có thể accept JSON body thay vì form data
+    """
+    import requests
+    import urllib3
+    
+    urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+    
+    logger.info(f"Sending JSON to API (alternative method): {endpoint_url}")
+    
+    headers = {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+        'User-Agent': 'Airflow-BHYT-ETL/2.0',
+        'X-MA-LK': ma_lk
+    }
+    
+    # Send entire JSON as request body
+    # API sẽ cần [FromBody] attribute thay vì simple string parameter
+    try:
+        response = requests.post(
+            endpoint_url,
+            data=json_data.encode('utf-8'),  # Send raw JSON string
+            headers=headers,
+            timeout=60,
+            verify=False
+        )
+        
+        if response.status_code in [200, 201, 202]:
+            return {
+                'status': 'success',
+                'status_code': response.status_code,
+                'response_data': response.text,
+                'timestamp': datetime.utcnow().isoformat()
+            }
+        else:
+            return {
+                'status': 'failed',
+                'status_code': response.status_code,
+                'error_message': response.text,
+                'timestamp': datetime.utcnow().isoformat()
+            }
+            
+    except Exception as e:
+        logger.error(f"API call failed: {str(e)}")
+        return {
+            'status': 'error',
+            'status_code': 0,
+            'error_message': str(e),
+            'timestamp': datetime.utcnow().isoformat()
+        }
+
 
 
 # ============================================
