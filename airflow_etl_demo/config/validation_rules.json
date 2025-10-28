@@ -1,0 +1,21 @@
+{
+  "required_fields": {
+    "patientId": ".//patient/id",
+    "patientName": ".//patient/name",
+    "encounterDate": ".//encounter/effectiveTime"
+  },
+  "data_types": {
+    "patientId": {
+      "xpath": ".//patient/id",
+      "type": "alphanumeric"
+    },
+    "age": {
+      "xpath": ".//patient/age",
+      "type": "numeric"
+    }
+  },
+  "business_rules": {
+    "max_age": 150,
+    "min_age": 0
+  }
+}

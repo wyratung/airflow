@@ -1,0 +1,1059 @@
+"""
+Complete BHYT ETL Pipeline với luồng:
+Load -> Validate -> Transform -> Verify -> Output JSON
+"""
+
+from airflow import DAG
+from airflow.operators.python import PythonOperator
+# from airflow.providers.amazon.aws.hooks.sqs import SqsHook
+from airflow.models import Variable
+from airflow.exceptions import AirflowFailException
+from datetime import datetime, timedelta
+import logging
+import json
+import sys
+import os
+import pathlib
+from pathlib import Path
+sys.path.insert(0, '/opt/airflow/plugins/helpers')
+
+from s3_loader import S3FileLoader
+from bhyt_transformer_complete import CompleteBHYTTransformer
+from bhyt_validator import CompleteBHYTValidator
+from external_verifier import ExternalSystemVerifier
+
+# ============================================
+# DAG Configuration
+# ============================================
+
+default_args = {
+    'owner': 'bhyt_data_team',
+    'depends_on_past': False,
+    'start_date': datetime(2025, 10, 28),
+    'email': ['datateam@example.com'],
+    'email_on_failure': True,
+    'email_on_retry': False,
+    'retries': 3,
+    'retry_delay': timedelta(minutes=5),
+    'retry_exponential_backoff': True,
+    'max_retry_delay': timedelta(minutes=30),
+}
+
+dag = DAG(
+    dag_id='bhyt_complete_etl_pipeline_v2',
+    default_args=default_args,
+    description='Complete ETL: Load -> Validate -> Transform -> Verify -> JSON Output',
+    schedule_interval='*/15 * * * *',  # Chạy mỗi 15 phút
+    catchup=False,
+    max_active_runs=1,
+    tags=['bhyt', 'qd4750', 'etl', 'production']
+)
+
+
+# ============================================
+# TASK 1: LOAD - Download và Decode từ S3
+# ============================================
+
+def task_load_from_s3(**context):
+    """
+    TASK 1: Load message từ SQS, download file từ S3, decode XML
+    
+    Input: SQS Message với S3 path
+    Output: Raw XML string (đã decode)
+    """
+    logger = logging.getLogger(__name__)
+    ti = context['task_instance']
+    execution_date = context['execution_date']
+    
+    logger.info("=" * 80)
+    logger.info(f"TASK 1: LOAD - Starting at {execution_date}")
+    logger.info("=" * 80)
+    
+    try:
+        # Step 1: Receive message từ SQS Queue
+        logger.info("Step 1: Receiving message from SQS...")
+        
+        # sqs_hook = SqsHook(aws_conn_id='aws_default')
+        # queue_url = Variable.get('bhyt_sqs_queue_url', 
+        #                          'https://sqs.ap-southeast-1.amazonaws.com/123456789/bhyt-xml-queue')
+        
+        # messages = sqs_hook.receive_message(
+        #     queue_url=queue_url,
+        #     max_number_of_messages=1,
+        #     wait_time_seconds=10,
+        #     attribute_names=['All']
+        # )
+        
+        # if not messages or 'Messages' not in messages:
+        #     logger.warning("No messages available in queue")
+        #     raise AirflowFailException("No messages to process")
+        
+        # message = messages['Messages'][0]
+        # message_body = json.loads(message['Body'])
+        # receipt_handle = message['ReceiptHandle']
+        
+        # logger.info(f"Message received: {message['MessageId']}")
+        
+        # # Step 2: Extract S3 information từ message
+        # logger.info("Step 2: Extracting S3 information...")
+        
+        # # Message format có thể là:
+        # # {"bucket": "bhyt-xml-bucket", "key": "2025/10/28/file.xml"}
+        # # hoặc {"Records": [{"s3": {"bucket": {"name": "..."}, "object": {"key": "..."}}}]}
+        
+        # if 'Records' in message_body:
+        #     # S3 Event Notification format
+        #     s3_record = message_body['Records'][0]['s3']
+        #     s3_bucket = s3_record['bucket']['name']
+        #     s3_key = s3_record['object']['key']
+        # else:
+        #     # Simple format
+        #     s3_bucket = message_body.get('bucket')
+        #     s3_key = message_body.get('key')
+        
+        # if not s3_bucket or not s3_key:
+        #     raise ValueError("Missing S3 bucket or key in message")
+        
+        # logger.info(f"S3 Location: s3://{s3_bucket}/{s3_key}")
+        
+        # Step 3: Download file từ S3
+        logger.info("Step 3: Downloading file from S3...")
+        
+        s3_loader = S3FileLoader(
+            aws_access_key=Variable.get('aws_access_key_id', default_var=None),
+            aws_secret_key=Variable.get('aws_secret_access_key', default_var=None),
+            region_name=Variable.get('aws_region', default_var='ap-southeast-1')
+        )
+        
+        # Download và auto-detect encoding/compression
+        file_path = Path(__file__).parent / "test.xml"
+        with open(file_path, "rb") as f:
+            file_content = f.read()
+        # xml_content = s3_loader.download_and_decode_file(s3_bucket, s3_key)
+        loader = S3FileLoader(
+            aws_access_key="fake",
+            aws_secret_key="fake",
+            region_name="ap-southeast-1"    
+        )
+        xml_content = loader._detect_and_decode(file_content, filename="test.xml")
+        
+        logger.info(f"Successfully downloaded and decoded XML")
+        logger.info(f"XML content length: {len(xml_content)} characters")
+        
+        # Step 4: Basic XML structure check
+        logger.info("Step 4: Performing basic XML structure check...")
+        
+        if not xml_content.strip():
+            raise ValueError("Empty XML content")
+        
+        if not ('<' in xml_content and '>' in xml_content):
+            raise ValueError("Invalid XML structure - missing angle brackets")
+        
+        # Check for common XML elements
+        required_elements = ['<?xml', '<HOSO', '<TONG_HOP', 'MA_LK']
+        found_elements = [elem for elem in required_elements if elem in xml_content]
+        
+        logger.info(f"Found XML elements: {found_elements}")
+        
+        # Step 5: Push data to XCom
+        logger.info("Step 5: Pushing data to XCom...")
+        
+        # Push raw XML content
+        ti.xcom_push(key='raw_xml_content', value=xml_content)
+        
+        # Push metadata for test context
+        metadata = {
+            'message_id': 'test-message-id',
+            's3_bucket': 'test-bucket',
+            's3_key': 'test/file.xml',
+            's3_uri': 'test://test-bucket/test/file.xml',
+            'file_size': len(xml_content),
+            'sqs_receipt_handle': None,
+            'received_at': datetime.utcnow().isoformat(),
+            'message_attributes': {},
+            'test_mode': True
+        }
+        
+        ti.xcom_push(key='file_metadata', value=metadata)
+        
+        logger.info("=" * 80)
+        logger.info("TASK 1: LOAD - Completed successfully")
+        logger.info(f"Metadata: {json.dumps(metadata, indent=2)}")
+        logger.info("=" * 80)
+        
+        return {
+            'status': 'success',
+            'file_size': len(xml_content),
+            's3_uri': metadata['s3_uri']
+        }
+        
+    except Exception as e:
+        logger.error(f"TASK 1: LOAD - Failed with error: {str(e)}")
+        logger.exception(e)
+        raise AirflowFailException(f"Load task failed: {str(e)}")
+
+
+# ============================================
+# TASK 2: VALIDATE - Validate XML Structure
+# ============================================
+
+def task_validate_xml(**context):
+    """
+    TASK 2: Validate XML structure và business rules
+    
+    Input: Raw XML string
+    Output: Validation result và parsed XML root
+    """
+    logger = logging.getLogger(__name__)
+    ti = context['task_instance']
+    
+    logger.info("=" * 80)
+    logger.info("TASK 2: VALIDATE - Starting")
+    logger.info("=" * 80)
+    
+    try:
+        # Step 1: Pull XML content từ previous task
+        logger.info("Step 1: Pulling XML content from previous task...")
+        
+        xml_content = ti.xcom_pull(task_ids='load_from_s3', key='raw_xml_content')
+        file_metadata = ti.xcom_pull(task_ids='load_from_s3', key='file_metadata')
+        
+        if not xml_content:
+            raise ValueError("No XML content received from previous task")
+        
+        logger.info(f"XML content size: {len(xml_content)} characters")
+        
+        # Step 2: XML Syntax Validation
+        logger.info("Step 2: Validating XML syntax...")
+        
+        import xml.etree.ElementTree as ET
+        
+        try:
+            # Remove BOM if exists
+            if xml_content.startswith('\ufeff'):
+                xml_content = xml_content[1:]
+                logger.info("Removed BOM from XML content")
+            
+            root = ET.fromstring(xml_content.encode('utf-8'))
+            logger.info(f"XML parsed successfully. Root element: {root.tag}")
+            
+        except ET.ParseError as e:
+            logger.error(f"XML parsing error: {str(e)}")
+            raise ValueError(f"Invalid XML syntax: {str(e)}")
+        
+        # Step 3: Schema Validation
+        logger.info("Step 3: Validating XML schema and structure...")
+        
+        validation_errors = []
+        validation_warnings = []
+        
+        # Check required root elements
+        required_elements = {
+            'MA_LK': './/MA_LK',
+            'MACSKCB': './/MACSKCB',
+            'HO_TEN': './/HO_TEN',
+            'MA_THE': './/MA_THE',
+            'NGAY_VAO': './/NGAY_VAO',
+            'NGAY_RA': './/NGAY_RA'
+        }
+        
+        for field_name, xpath in required_elements.items():
+            element = root.find(xpath)
+            if element is None or not element.text:
+                validation_errors.append(f"Missing or empty required field: {field_name}")
+            else:
+                logger.info(f"✓ Found {field_name}: {element.text[:50] if len(element.text) > 50 else element.text}")
+        
+        # Step 4: Business Rules Validation
+        logger.info("Step 4: Validating business rules...")
+        
+        # Validate MA_THE format (15 ký tự)
+        ma_the_elem = root.find('.//MA_THE')
+        if ma_the_elem is not None and ma_the_elem.text:
+            ma_the = ma_the_elem.text.strip()
+            if len(ma_the) != 15:
+                validation_errors.append(f"MA_THE must be 15 characters, got {len(ma_the)}")
+            else:
+                logger.info(f"✓ MA_THE format valid: {ma_the}")
+        
+        # Validate dates
+        ngay_vao = root.findtext('.//NGAY_VAO', '')
+        ngay_ra = root.findtext('.//NGAY_RA', '')
+        
+        if ngay_vao and ngay_ra:
+            try:
+                dt_vao = datetime.strptime(ngay_vao, '%Y%m%d%H%M%S')
+                dt_ra = datetime.strptime(ngay_ra, '%Y%m%d%H%M%S')
+                
+                if dt_ra < dt_vao:
+                    validation_errors.append("NGAY_RA must be after NGAY_VAO")
+                else:
+                    so_ngay = (dt_ra - dt_vao).days
+                    logger.info(f"✓ Date range valid: {so_ngay} days")
+                    
+            except ValueError as e:
+                validation_errors.append(f"Invalid date format: {str(e)}")
+        
+        # Validate chi phí
+        t_tongchi = root.findtext('.//T_TONGCHI', '0')
+        try:
+            tongchi = float(t_tongchi)
+            if tongchi <= 0:
+                validation_warnings.append("T_TONGCHI is zero or negative")
+            else:
+                logger.info(f"✓ T_TONGCHI: {tongchi:,.0f} VND")
+        except ValueError:
+            validation_errors.append("T_TONGCHI is not a valid number")
+        
+        # Step 5: Count records in each table
+        logger.info("Step 5: Counting records in tables...")
+        
+        record_counts = {
+            'tonghop': 1,
+            'thuoc': len(root.findall('.//CHI_TIET_THUOC')),
+            'dvkt': len(root.findall('.//CHI_TIET_DVKT')),
+            'cls': len(root.findall('.//CHI_TIET_CLS')),
+            'dienbienlamsang': len(root.findall('.//DIEN_BIEN_LAM_SANG'))
+        }
+        
+        logger.info(f"Record counts: {record_counts}")
+        
+        # Step 6: Determine validation status
+        is_valid = len(validation_errors) == 0
+        
+        if validation_errors:
+            logger.error(f"Validation FAILED with {len(validation_errors)} errors:")
+            for error in validation_errors:
+                logger.error(f"  - {error}")
+        
+        if validation_warnings:
+            logger.warning(f"Validation has {len(validation_warnings)} warnings:")
+            for warning in validation_warnings:
+                logger.warning(f"  - {warning}")
+        
+        # Step 7: Push validation results to XCom
+        logger.info("Step 7: Pushing validation results to XCom...")
+        
+        validation_result = {
+            'is_valid': is_valid,
+            'validation_status': 'PASSED' if is_valid else 'FAILED',
+            'error_count': len(validation_errors),
+            'warning_count': len(validation_warnings),
+            'errors': validation_errors,
+            'warnings': validation_warnings,
+            'record_counts': record_counts,
+            'validated_at': datetime.utcnow().isoformat()
+        }
+        
+        ti.xcom_push(key='validation_result', value=validation_result)
+        ti.xcom_push(key='validated_xml', value=xml_content)  # Pass through for next task
+        
+        logger.info("=" * 80)
+        logger.info(f"TASK 2: VALIDATE - Completed")
+        logger.info(f"Status: {'✓ PASSED' if is_valid else '✗ FAILED'}")
+        logger.info(f"Errors: {len(validation_errors)}, Warnings: {len(validation_warnings)}")
+        logger.info("=" * 80)
+        
+        # Nếu có lỗi nghiêm trọng, raise exception
+        if not is_valid and len(validation_errors) > 5:
+            raise AirflowFailException(f"Validation failed with {len(validation_errors)} errors")
+        
+        return validation_result
+        
+    except Exception as e:
+        logger.error(f"TASK 2: VALIDATE - Failed with error: {str(e)}")
+        logger.exception(e)
+        raise
+
+
+# ============================================
+# TASK 3: TRANSFORM - Transform to DTO
+# ============================================
+
+def task_transform_to_dto(**context):
+    """
+    TASK 3: Transform validated XML sang DTO structure
+    
+    Input: Validated XML string
+    Output: Complete DTO (dict) với tất cả các bảng
+    """
+    logger = logging.getLogger(__name__)
+    ti = context['task_instance']
+    
+    logger.info("=" * 80)
+    logger.info("TASK 3: TRANSFORM - Starting")
+    logger.info("=" * 80)
+    
+    try:
+        # Step 1: Pull validated XML
+        logger.info("Step 1: Pulling validated XML from previous task...")
+        
+        xml_content = ti.xcom_pull(task_ids='validate_xml', key='validated_xml')
+        validation_result = ti.xcom_pull(task_ids='validate_xml', key='validation_result')
+        file_metadata = ti.xcom_pull(task_ids='load_from_s3', key='file_metadata')
+        
+        if not xml_content:
+            raise ValueError("No validated XML received")
+        
+        logger.info(f"Validation status: {validation_result['validation_status']}")
+        
+        # Step 2: Initialize transformer
+        logger.info("Step 2: Initializing BHYT transformer...")
+        
+        transformer = CompleteBHYTTransformer()
+        
+        # Step 3: Transform XML to DTO
+        logger.info("Step 3: Transforming XML to DTO structure...")
+        
+        dto = transformer.transform_complete_xml(xml_content)
+        
+        logger.info(f"Transformation completed successfully")
+        logger.info(f"DTO resource type: {dto['resourceType']}")
+        logger.info(f"DTO standard: {dto['standard']}")
+        
+        # Step 4: Extract key information
+        logger.info("Step 4: Extracting key information...")
+        
+        tonghop = dto.get('tonghop', {})
+        
+        key_info = {
+            'MA_LK': tonghop.get('MA_LK'),
+            'MA_BN': tonghop.get('MA_BN'),
+            'HO_TEN': tonghop.get('HO_TEN'),
+            'NGAY_SINH': tonghop.get('NGAY_SINH'),
+            'GIOI_TINH': tonghop.get('GIOI_TINH'),
+            'MA_THE': tonghop.get('MA_THE'),
+            'MA_CSKCB': tonghop.get('MA_CSKCB'),
+            'NGAY_VAO': tonghop.get('NGAY_VAO'),
+            'NGAY_RA': tonghop.get('NGAY_RA'),
+            'T_TONGCHI': tonghop.get('T_TONGCHI'),
+            'T_BHTT': tonghop.get('T_BHTT'),
+            'T_BNTT': tonghop.get('T_BNTT')
+        }
+        
+        logger.info("Key information extracted:")
+        for key, value in key_info.items():
+            logger.info(f"  {key}: {value}")
+        
+        # Step 5: Record counts
+        record_counts = dto['metadata'].get('recordCount', {})
+        
+        logger.info(f"Record counts after transformation:")
+        logger.info(f"  Thuốc: {record_counts.get('thuoc', 0)}")
+        logger.info(f"  DVKT: {record_counts.get('dvkt', 0)}")
+        logger.info(f"  CLS: {record_counts.get('cls', 0)}")
+        logger.info(f"  Diễn biến lâm sàng: {record_counts.get('dbls', 0)}")
+        
+        # Step 6: Add source metadata
+        logger.info("Step 6: Adding source metadata to DTO...")
+        
+        dto['source_metadata'] = {
+            's3_uri': file_metadata.get('s3_uri'),
+            'message_id': file_metadata.get('message_id'),
+            'received_at': file_metadata.get('received_at'),
+            'validation_result': validation_result,
+            'transformation_timestamp': datetime.utcnow().isoformat()
+        }
+        
+        # Step 7: Push DTO to XCom
+        logger.info("Step 7: Pushing DTO to XCom...")
+        
+        # Push complete DTO
+        ti.xcom_push(key='complete_dto', value=dto)
+        
+        # Push summary for easier access
+        dto_summary = {
+            'ma_lk': key_info['MA_LK'],
+            'patient_name': key_info['HO_TEN'],
+            'ma_the': key_info['MA_THE'],
+            'total_cost': key_info['T_TONGCHI'],
+            'record_counts': record_counts,
+            'transform_status': 'success'
+        }
+        
+        ti.xcom_push(key='dto_summary', value=dto_summary)
+        
+        logger.info("=" * 80)
+        logger.info("TASK 3: TRANSFORM - Completed successfully")
+        logger.info(f"MA_LK: {key_info['MA_LK']}")
+        logger.info(f"Patient: {key_info['HO_TEN']}")
+        logger.info(f"Total records: {sum(record_counts.values())}")
+        logger.info("=" * 80)
+        
+        return dto_summary
+        
+    except Exception as e:
+        logger.error(f"TASK 3: TRANSFORM - Failed with error: {str(e)}")
+        logger.exception(e)
+        raise
+
+
+# ============================================
+# TASK 4: VERIFY - Verify với External System
+# ============================================
+
+def task_verify_external_system(**context):
+    """
+    TASK 4: Verify DTO với external systems (MOCK DATA)
+    
+    Input: Complete DTO
+    Output: Verification results từ external systems
+    """
+    logger = logging.getLogger(__name__)
+    ti = context['task_instance']
+    
+    logger.info("=" * 80)
+    logger.info("TASK 4: VERIFY - Starting external system verification")
+    logger.info("=" * 80)
+    
+    try:
+        # Step 1: Pull DTO from previous task
+        logger.info("Step 1: Pulling DTO from previous task...")
+        
+        dto = ti.xcom_pull(task_ids='transform_to_dto', key='complete_dto')
+        dto_summary = ti.xcom_pull(task_ids='transform_to_dto', key='dto_summary')
+        
+        if not dto:
+            raise ValueError("No DTO received from transform task")
+        
+        tonghop = dto.get('tonghop', {})
+        
+        # Step 2: Verify Patient Identity (MOCK)
+        logger.info("Step 2: Verifying patient identity with National ID System (MOCK)...")
+        
+        patient_verification = verify_patient_identity_mock(
+            ma_bn=tonghop.get('MA_BN'),
+            ho_ten=tonghop.get('HO_TEN'),
+            ngay_sinh=tonghop.get('NGAY_SINH'),
+            so_cccd=tonghop.get('SO_CCCD')
+        )
+        
+        logger.info(f"Patient verification: {patient_verification['status']}")
+        logger.info(f"Match score: {patient_verification['match_score']}")
+        
+        # Step 3: Verify BHYT Card (MOCK)
+        logger.info("Step 3: Verifying BHYT card with BHXH Portal (MOCK)...")
+        
+        card_verification = verify_bhyt_card_mock(
+            ma_the=tonghop.get('MA_THE'),
+            ho_ten=tonghop.get('HO_TEN'),
+            ngay_sinh=tonghop.get('NGAY_SINH'),
+            gt_the_tu=tonghop.get('GT_THE_TU'),
+            gt_the_den=tonghop.get('GT_THE_DEN')
+        )
+        
+        logger.info(f"Card verification: {card_verification['status']}")
+        logger.info(f"Card is {'VALID' if card_verification['is_valid'] else 'INVALID'}")
+        logger.info(f"Coverage: {card_verification['coverage_info']['coverage_percentage']}%")
+        
+        # Step 4: Verify Facility Registration (MOCK)
+        logger.info("Step 4: Verifying facility registration (MOCK)...")
+        
+        facility_verification = verify_facility_mock(
+            ma_cskcb=tonghop.get('MA_CSKCB'),
+            ma_khoa=tonghop.get('MA_KHOA')
+        )
+        
+        logger.info(f"Facility verification: {facility_verification['status']}")
+        logger.info(f"Facility name: {facility_verification['facility_info']['facility_name']}")
+        
+        # Step 5: Verify Medication Codes (MOCK - Sample only)
+        logger.info("Step 5: Verifying medication codes (MOCK - sample)...")
+        
+        thuoc_list = dto.get('chitiet_thuoc', [])
+        medication_verification = verify_medications_mock(thuoc_list[:5])  # Sample first 5
+        
+        logger.info(f"Verified {len(medication_verification['verified_items'])} medications")
+        logger.info(f"Valid: {medication_verification['valid_count']}, "
+                   f"Invalid: {medication_verification['invalid_count']}")
+        
+        # Step 6: Verify Service Codes (MOCK - Sample only)
+        logger.info("Step 6: Verifying service codes (MOCK - sample)...")
+        
+        dvkt_list = dto.get('chitiet_dvkt', [])
+        service_verification = verify_services_mock(dvkt_list[:5])  # Sample first 5
+        
+        logger.info(f"Verified {len(service_verification['verified_items'])} services")
+        
+        # Step 7: Cross-check Cost Calculation (MOCK)
+        logger.info("Step 7: Cross-checking cost calculation...")
+        
+        cost_verification = verify_cost_calculation_mock(
+            t_tongchi=tonghop.get('T_TONGCHI'),
+            t_bhtt=tonghop.get('T_BHTT'),
+            t_bntt=tonghop.get('T_BNTT'),
+            t_bncct=tonghop.get('T_BNCCT'),
+            detail_records={
+                'thuoc': thuoc_list,
+                'dvkt': dvkt_list
+            }
+        )
+        
+        logger.info(f"Cost verification: {cost_verification['status']}")
+        logger.info(f"Discrepancy: {cost_verification['discrepancy_amount']} VND")
+        
+        # Step 8: Compile verification results
+        logger.info("Step 8: Compiling verification results...")
+        
+        verification_results = {
+            'overall_status': 'VERIFIED',
+            'verification_timestamp': datetime.utcnow().isoformat(),
+            'ma_lk': tonghop.get('MA_LK'),
+            
+            'verifications': {
+                'patient_identity': patient_verification,
+                'bhyt_card': card_verification,
+                'facility': facility_verification,
+                'medications': medication_verification,
+                'services': service_verification,
+                'cost_calculation': cost_verification
+            },
+            
+            'verification_summary': {
+                'total_checks': 6,
+                'passed_checks': 0,
+                'failed_checks': 0,
+                'warning_checks': 0
+            }
+        }
+        
+        # Count verification results
+        for check_name, check_result in verification_results['verifications'].items():
+            status = check_result.get('status', 'unknown')
+            if status in ['verified', 'valid', 'passed']:
+                verification_results['verification_summary']['passed_checks'] += 1
+            elif status in ['failed', 'invalid']:
+                verification_results['verification_summary']['failed_checks'] += 1
+            else:
+                verification_results['verification_summary']['warning_checks'] += 1
+        
+        # Determine overall status
+        if verification_results['verification_summary']['failed_checks'] > 0:
+            verification_results['overall_status'] = 'FAILED'
+        elif verification_results['verification_summary']['warning_checks'] > 2:
+            verification_results['overall_status'] = 'WARNING'
+        
+        # Step 9: Push verification results to XCom
+        logger.info("Step 9: Pushing verification results to XCom...")
+        
+        ti.xcom_push(key='verification_results', value=verification_results)
+        
+        logger.info("=" * 80)
+        logger.info("TASK 4: VERIFY - Completed")
+        logger.info(f"Overall Status: {verification_results['overall_status']}")
+        logger.info(f"Passed: {verification_results['verification_summary']['passed_checks']}/{verification_results['verification_summary']['total_checks']}")
+        logger.info("=" * 80)
+        
+        return verification_results
+        
+    except Exception as e:
+        logger.error(f"TASK 4: VERIFY - Failed with error: {str(e)}")
+        logger.exception(e)
+        raise
+
+
+# ============================================
+# TASK 5: OUTPUT JSON - Generate Final JSON
+# ============================================
+
+def task_output_json(**context):
+    """
+    TASK 5: Generate final JSON output và lưu vào destination
+    
+    Input: Complete DTO + Verification Results
+    Output: Final JSON file
+    """
+    logger = logging.getLogger(__name__)
+    ti = context['task_instance']
+    
+    logger.info("=" * 80)
+    logger.info("TASK 5: OUTPUT JSON - Starting")
+    logger.info("=" * 80)
+    
+    try:
+        # Step 1: Pull all data from previous tasks
+        logger.info("Step 1: Pulling data from all previous tasks...")
+        
+        file_metadata = ti.xcom_pull(task_ids='load_from_s3', key='file_metadata')
+        validation_result = ti.xcom_pull(task_ids='validate_xml', key='validation_result')
+        dto = ti.xcom_pull(task_ids='transform_to_dto', key='complete_dto')
+        verification_results = ti.xcom_pull(task_ids='verify_external', key='verification_results')
+        
+        # Step 2: Build final JSON structure
+        logger.info("Step 2: Building final JSON structure...")
+        
+        final_json = {
+            # Pipeline metadata
+            'pipeline_metadata': {
+                'pipeline_name': 'bhyt_complete_etl_pipeline_v2',
+                'execution_date': context['execution_date'].isoformat(),
+                'dag_run_id': context['dag_run'].run_id,
+                'task_instance_key': f"{context['dag'].dag_id}.{context['run_id']}",
+                'processed_at': datetime.utcnow().isoformat(),
+                'pipeline_version': '2.0.0'
+            },
+            
+            # Source information
+            'source': {
+                's3_uri': file_metadata.get('s3_uri'),
+                'message_id': file_metadata.get('message_id'),
+                'file_size': file_metadata.get('file_size'),
+                'received_at': file_metadata.get('received_at')
+            },
+            
+            # Validation results
+            'validation': {
+                'status': validation_result.get('validation_status'),
+                'is_valid': validation_result.get('is_valid'),
+                'error_count': validation_result.get('error_count'),
+                'warning_count': validation_result.get('warning_count'),
+                'errors': validation_result.get('errors', []),
+                'warnings': validation_result.get('warnings', [])
+            },
+            
+            # BHYT Data (Complete DTO)
+            'data': dto,
+            
+            # Verification results
+            'verification': verification_results,
+            
+            # Processing status
+            'processing_status': {
+                'overall_status': 'SUCCESS',
+                'load_status': 'completed',
+                'validation_status': validation_result.get('validation_status'),
+                'transform_status': 'completed',
+                'verification_status': verification_results.get('overall_status'),
+                'output_status': 'completed'
+            }
+        }
+        
+        # Determine overall processing status
+        if not validation_result.get('is_valid'):
+            final_json['processing_status']['overall_status'] = 'VALIDATION_FAILED'
+        elif verification_results.get('overall_status') == 'FAILED':
+            final_json['processing_status']['overall_status'] = 'VERIFICATION_FAILED'
+        elif verification_results.get('overall_status') == 'WARNING':
+            final_json['processing_status']['overall_status'] = 'SUCCESS_WITH_WARNINGS'
+        
+        # Step 3: Generate JSON string
+        logger.info("Step 3: Generating JSON string...")
+        
+        json_string = json.dumps(final_json, ensure_ascii=False, indent=2)
+        json_size = len(json_string)
+        
+        logger.info(f"JSON generated successfully. Size: {json_size:,} bytes")
+        
+        # Step 4: Save JSON to local file (temporary)
+        logger.info("Step 4: Saving JSON to local file...")
+        
+        ma_lk = dto.get('tonghop', {}).get('MA_LK', 'unknown')
+        output_filename = f"bhyt_{ma_lk}_{context['execution_date'].strftime('%Y%m%d_%H%M%S')}.json"
+        output_path = f"/tmp/{output_filename}"
+        
+        with open(output_path, 'w', encoding='utf-8') as f:
+            f.write(json_string)
+        
+        logger.info(f"JSON saved to: {output_path}")
+        
+        # Step 5: Upload JSON to S3 output bucket
+        logger.info("Step 5: Uploading JSON to S3 output bucket...")
+        
+        import boto3
+        
+        s3_client = boto3.client('s3',
+            aws_access_key_id=Variable.get('aws_access_key_id', default_var=None),
+            aws_secret_access_key=Variable.get('aws_secret_access_key', default_var=None),
+            region_name=Variable.get('aws_region', default_var='ap-southeast-1')
+        )
+        
+        output_bucket = Variable.get('bhyt_output_bucket', 'bhyt-processed-json')
+        output_key = f"processed/{context['execution_date'].strftime('%Y/%m/%d')}/{output_filename}"
+        
+        s3_client.upload_file(
+            output_path,
+            output_bucket,
+            output_key,
+            ExtraArgs={
+                'ContentType': 'application/json',
+                'Metadata': {
+                    'ma_lk': ma_lk,
+                    'processing_date': context['execution_date'].isoformat(),
+                    'pipeline_version': '2.0.0'
+                }
+            }
+        )
+        
+        output_s3_uri = f"s3://{output_bucket}/{output_key}"
+        logger.info(f"JSON uploaded to: {output_s3_uri}")
+        
+        # Step 6: Call external API to save data (optional)
+        logger.info("Step 6: Calling external API to save data...")
+        
+        api_response = call_external_api_to_save(final_json, ma_lk)
+        
+        logger.info(f"API call status: {api_response['status']}")
+        
+        # Step 7: Delete message from SQS (processing completed)
+        logger.info("Step 7: Deleting message from SQS queue...")
+        
+        receipt_handle = file_metadata.get('sqs_receipt_handle')
+        # if receipt_handle:
+        #     sqs_hook = SqsHook(aws_conn_id='aws_default')
+        #     queue_url = Variable.get('bhyt_sqs_queue_url')
+            
+        #     sqs_hook.delete_message(
+        #         queue_url=queue_url,
+        #         receipt_handle=receipt_handle
+        #     )
+        #     logger.info("SQS message deleted successfully")
+        
+        # Step 8: Push final results to XCom
+        logger.info("Step 8: Pushing final results to XCom...")
+        
+        final_results = {
+            'output_s3_uri': output_s3_uri,
+            'output_filename': output_filename,
+            'json_size': json_size,
+            'ma_lk': ma_lk,
+            'processing_status': final_json['processing_status']['overall_status'],
+            'api_response': api_response,
+            'completed_at': datetime.utcnow().isoformat()
+        }
+        
+        ti.xcom_push(key='final_results', value=final_results)
+        
+        # Clean up temp file
+        os.remove(output_path)
+        
+        logger.info("=" * 80)
+        logger.info("TASK 5: OUTPUT JSON - Completed successfully")
+        logger.info(f"Output: {output_s3_uri}")
+        logger.info(f"Status: {final_json['processing_status']['overall_status']}")
+        logger.info(f"MA_LK: {ma_lk}")
+        logger.info("=" * 80)
+        
+        return final_results
+        
+    except Exception as e:
+        logger.error(f"TASK 5: OUTPUT JSON - Failed with error: {str(e)}")
+        logger.exception(e)
+        raise
+
+
+# ============================================
+# MOCK VERIFICATION FUNCTIONS
+# ============================================
+
+def verify_patient_identity_mock(ma_bn: str, ho_ten: str, ngay_sinh: str, so_cccd: str) -> dict:
+    """Mock patient identity verification"""
+    import random
+    
+    return {
+        'status': 'verified',
+        'match_score': random.uniform(0.85, 1.0),
+        'verification_method': 'CCCD_LOOKUP',
+        'verified_info': {
+            'ma_bn': ma_bn,
+            'ho_ten': ho_ten,
+            'ngay_sinh': ngay_sinh,
+            'so_cccd': so_cccd,
+            'dia_chi_xac_thuc': '123 Đường ABC, Quận 1, TP.HCM'
+        },
+        'verified_at': datetime.utcnow().isoformat(),
+        'verification_source': 'National ID Database (MOCK)'
+    }
+
+def verify_bhyt_card_mock(ma_the: str, ho_ten: str, ngay_sinh: str, 
+                          gt_the_tu: str, gt_the_den: str) -> dict:
+    """Mock BHYT card verification"""
+    import random
+    
+    is_valid = random.choice([True, True, True, False])  # 75% valid
+    
+    return {
+        'status': 'valid' if is_valid else 'invalid',
+        'is_valid': is_valid,
+        'ma_the': ma_the,
+        'card_info': {
+            'ho_ten': ho_ten,
+            'ngay_sinh': ngay_sinh,
+            'ma_dkbd': 'CS01234',
+            'ma_kv': 'K1',
+            'gia_tri_tu': gt_the_tu,
+            'gia_tri_den': gt_the_den,
+            'loai_the': 'TN1'
+        },
+        'coverage_info': {
+            'coverage_percentage': 100 if is_valid else 0,
+            'is_active': is_valid,
+            'co_payment_rate': 0.05
+        },
+        'verified_at': datetime.utcnow().isoformat(),
+        'verification_source': 'BHXH Portal (MOCK)'
+    }
+
+def verify_facility_mock(ma_cskcb: str, ma_khoa: str) -> dict:
+    """Mock facility verification"""
+    
+    return {
+        'status': 'verified',
+        'ma_cskcb': ma_cskcb,
+        'facility_info': {
+            'facility_name': 'Bệnh viện Đa khoa Trung ương',
+            'facility_type': 'Tuyến Trung ương',
+            'facility_level': 'Hạng I',
+            'address': '123 Đường Giải Phóng, Hà Nội',
+            'license_number': 'BV-001234',
+            'is_active': True
+        },
+        'department_info': {
+            'ma_khoa': ma_khoa,
+            'ten_khoa': 'Khoa Nội Tổng Hợp',
+            'is_active': True
+        },
+        'verified_at': datetime.utcnow().isoformat(),
+        'verification_source': 'Ministry of Health Database (MOCK)'
+    }
+
+def verify_medications_mock(thuoc_list: list) -> dict:
+    """Mock medication verification"""
+    import random
+    
+    verified_items = []
+    valid_count = 0
+    invalid_count = 0
+    
+    for thuoc in thuoc_list[:10]:  # Verify first 10
+        is_valid = random.choice([True, True, True, False])  # 75% valid
+        
+        verified_items.append({
+            'ma_thuoc': thuoc.get('MA_THUOC'),
+            'ten_thuoc': thuoc.get('TEN_THUOC'),
+            'is_valid': is_valid,
+            'is_in_catalog': is_valid,
+            'unit_price_verified': is_valid,
+            'insurance_covered': is_valid
+        })
+        
+        if is_valid:
+            valid_count += 1
+        else:
+            invalid_count += 1
+    
+    return {
+        'status': 'completed',
+        'verified_items': verified_items,
+        'total_checked': len(verified_items),
+        'valid_count': valid_count,
+        'invalid_count': invalid_count,
+        'verification_source': 'National Drug Catalog (MOCK)'
+    }
+
+def verify_services_mock(dvkt_list: list) -> dict:
+    """Mock service code verification"""
+    import random
+    
+    verified_items = []
+    
+    for dvkt in dvkt_list[:10]:  # Verify first 10
+        is_valid = random.choice([True, True, True, False])
+        
+        verified_items.append({
+            'ma_dich_vu': dvkt.get('MA_DICH_VU'),
+            'ten_dich_vu': dvkt.get('TEN_DICH_VU'),
+            'is_valid': is_valid,
+            'price_verified': is_valid
+        })
+    
+    return {
+        'status': 'completed',
+        'verified_items': verified_items,
+        'verification_source': 'Service Catalog (MOCK)'
+    }
+
+def verify_cost_calculation_mock(t_tongchi: float, t_bhtt: float, 
+                                 t_bntt: float, t_bncct: float, 
+                                 detail_records: dict) -> dict:
+    """Mock cost calculation verification"""
+    import random
+    
+    # Calculate from details (simplified)
+    calculated_total = t_tongchi * random.uniform(0.98, 1.02)
+    discrepancy = abs(t_tongchi - calculated_total)
+    
+    return {
+        'status': 'passed' if discrepancy < 1000 else 'warning',
+        'declared_total': t_tongchi,
+        'calculated_total': calculated_total,
+        'discrepancy_amount': discrepancy,
+        'discrepancy_percentage': (discrepancy / t_tongchi * 100) if t_tongchi > 0 else 0,
+        'cost_breakdown_verified': True,
+        'verification_source': 'Cost Verification Engine (MOCK)'
+    }
+
+def call_external_api_to_save(data: dict, ma_lk: str) -> dict:
+    """Mock API call to save data"""
+    import random
+    import time
+    
+    time.sleep(0.5)  # Simulate API delay
+    
+    return {
+        'status': 'success',
+        'record_id': f"REC_{ma_lk}_{int(time.time())}",
+        'api_endpoint': 'https://api.example.com/bhyt/records',
+        'response_code': 201,
+        'message': 'Record saved successfully',
+        'saved_at': datetime.utcnow().isoformat()
+    }
+
+
+# ============================================
+# Define Airflow Tasks
+# ============================================
+
+task_1_load = PythonOperator(
+    task_id='load_from_s3',
+    python_callable=task_load_from_s3,
+    provide_context=True,
+    dag=dag,
+)
+
+task_2_validate = PythonOperator(
+    task_id='validate_xml',
+    python_callable=task_validate_xml,
+    provide_context=True,
+    dag=dag,
+)
+
+task_3_transform = PythonOperator(
+    task_id='transform_to_dto',
+    python_callable=task_transform_to_dto,
+    provide_context=True,
+    dag=dag,
+)
+
+task_4_verify = PythonOperator(
+    task_id='verify_external',
+    python_callable=task_verify_external_system,
+    provide_context=True,
+    dag=dag,
+)
+
+task_5_output = PythonOperator(
+    task_id='output_json',
+    python_callable=task_output_json,
+    provide_context=True,
+    dag=dag,
+)
+
+
+# ============================================
+# Set Task Dependencies
+# ============================================
+
+task_1_load >> task_2_validate >> task_3_transform >> task_4_verify >> task_5_output
+
+if __name__ == "__main__":
+    dag.test()
