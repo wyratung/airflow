@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema" elementFormDefault="qualified">
+  
+  <xs:element name="CHITIEU_CHITIET_DIENBIENLAMSANG">
+    <xs:complexType>
+      <xs:sequence>
+        <xs:element name="DSACH_CHI_TIET_DIEN_BIEN_BENH">
+          <xs:complexType>
+            <xs:sequence>
+              <xs:element name="CHI_TIET_DIEN_BIEN_BENH" type="DienBienType" maxOccurs="unbounded"/>
+            </xs:sequence>
+          </xs:complexType>
+        </xs:element>
+      </xs:sequence>
+    </xs:complexType>
+  </xs:element>
+
+  <xs:complexType name="DienBienType">
+    <xs:sequence>
+      <xs:element name="MA_LK" type="xs:string"/>
+      <xs:element name="STT" type="xs:integer"/>
+      <xs:element name="DIEN_BIEN_LS" type="xs:string"/>
+      <xs:element name="GIAI_DOAN_BENH" type="xs:string" minOccurs="0"/>
+      <xs:element name="HOI_CHAN" type="xs:string" minOccurs="0"/>
+      <xs:element name="PHAU_THUAT" type="xs:string" minOccurs="0"/>
+      <xs:element name="THOI_DIEM_DBLS" type="xs:string"/>
+      <xs:element name="NGUOI_THUC_HIEN" type="xs:string" minOccurs="0"/>
+      <xs:element name="DU_PHONG" type="xs:string" minOccurs="0"/>
+    </xs:sequence>
+  </xs:complexType>
+
+</xs:schema>

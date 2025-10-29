@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema" elementFormDefault="qualified">
+  
+  <xs:element name="CHITIEU_CHITIET_CHISOSINHTON">
+    <xs:complexType>
+      <xs:sequence>
+        <xs:element name="DSACH_CHI_TIET_CHI_SO_SINH_TON">
+          <xs:complexType>
+            <xs:sequence>
+              <xs:element name="CHI_TIET_CHI_SO_SINH_TON" type="ChiTietChiSoSinhTonType" maxOccurs="unbounded"/>
+            </xs:sequence>
+          </xs:complexType>
+        </xs:element>
+      </xs:sequence>
+    </xs:complexType>
+  </xs:element>
+
+  <xs:complexType name="ChiTietChiSoSinhTonType">
+    <xs:sequence>
+      <xs:element name="MA_LK" type="xs:string"/>
+      <xs:element name="STT" type="xs:integer"/>
+      <xs:element name="NGAY_DO" type="xs:string"/>
+      <xs:element name="NHIP_THO" type="xs:integer" minOccurs="0"/>
+      <xs:element name="NHIP_TIM" type="xs:integer" minOccurs="0"/>
+      <xs:element name="HUYET_AP_MAX" type="xs:integer" minOccurs="0"/>
+      <xs:element name="HUYET_AP_MIN" type="xs:integer" minOccurs="0"/>
+      <xs:element name="NHIET_DO" type="xs:decimal" minOccurs="0"/>
+      <xs:element name="CAN_NANG" type="xs:decimal" minOccurs="0"/>
+      <xs:element name="CHIEU_CAO" type="xs:decimal" minOccurs="0"/>
+      <xs:element name="BMI" type="xs:decimal" minOccurs="0"/>
+      <xs:element name="SPO2" type="xs:decimal" minOccurs="0"/>
+      <xs:element name="GLASGOW" type="xs:integer" minOccurs="0"/>
+      <xs:element name="NGUOI_THUC_HIEN" type="xs:string" minOccurs="0"/>
+      <xs:element name="GHI_CHU" type="xs:string" minOccurs="0"/>
+      <xs:element name="DU_PHONG" type="xs:string" minOccurs="0"/>
+    </xs:sequence>
+  </xs:complexType>
+
+</xs:schema>

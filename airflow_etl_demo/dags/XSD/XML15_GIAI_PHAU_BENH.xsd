@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema" elementFormDefault="qualified">
+  
+  <xs:element name="CHITIEU_CHITIET_GIAIPHAUBENH">
+    <xs:complexType>
+      <xs:sequence>
+        <xs:element name="DSACH_CHI_TIET_GIAI_PHAU_BENH">
+          <xs:complexType>
+            <xs:sequence>
+              <xs:element name="CHI_TIET_GIAI_PHAU_BENH" type="ChiTietGiaiPhauBenhType" maxOccurs="unbounded"/>
+            </xs:sequence>
+          </xs:complexType>
+        </xs:element>
+      </xs:sequence>
+    </xs:complexType>
+  </xs:element>
+
+  <xs:complexType name="ChiTietGiaiPhauBenhType">
+    <xs:sequence>
+      <xs:element name="MA_LK" type="xs:string"/>
+      <xs:element name="STT" type="xs:integer"/>
+      <xs:element name="MA_DICH_VU" type="xs:string"/>
+      <xs:element name="TEN_DICH_VU" type="xs:string"/>
+      <xs:element name="LOAI_MAU_BENH_PHAM" type="xs:string" minOccurs="0"/>
+      <xs:element name="MA_BENH_PHAM" type="xs:string" minOccurs="0"/>
+      <xs:element name="SO_LUONG_MAU" type="xs:integer" minOccurs="0"/>
+      <xs:element name="NGAY_LAY_MAU" type="xs:string"/>
+      <xs:element name="NGAY_NHAN_MAU" type="xs:string" minOccurs="0"/>
+      <xs:element name="VI_TRI_LAY_MAU" type="xs:string" minOccurs="0"/>
+      <xs:element name="MO_TA_DAI_THE" type="xs:string" minOccurs="0"/>
+      <xs:element name="MO_TA_VI_THE" type="xs:string" minOccurs="0"/>
+      <xs:element name="CHAN_DOAN_GPB" type="xs:string" minOccurs="0"/>
+      <xs:element name="MA_ICD_GPB" type="xs:string" minOccurs="0"/>
+      <xs:element name="NGAY_KET_LUAN" type="xs:string" minOccurs="0"/>
+      <xs:element name="MA_BAC_SI_CHI_DINH" type="xs:string" minOccurs="0"/>
+      <xs:element name="MA_BAC_SI_DOC_KQ" type="xs:string" minOccurs="0"/>
+      <xs:element name="DU_PHONG" type="xs:string" minOccurs="0"/>
+    </xs:sequence>
+  </xs:complexType>
+
+</xs:schema>

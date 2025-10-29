@@ -3,6 +3,7 @@ Complete BHYT ETL Pipeline với luồng:
 Load -> Validate -> Transform -> Verify -> Output JSON
 """
 
+from asyncio.log import logger
 import tempfile
 from airflow import DAG
 from airflow.operators.python import PythonOperator
@@ -17,12 +18,13 @@ import os
 import re
 import pathlib
 from pathlib import Path
+from lxml import etree
 sys.path.insert(0, '/opt/airflow/plugins/helpers')
 
 from s3_loader import S3FileLoader
 from bhyt_transformer_complete import CompleteBHYTTransformer
-from bhyt_validator import CompleteBHYTValidator
-from external_verifier import ExternalSystemVerifier
+# from bhyt_validator import CompleteBHYTValidator
+# from external_verifier import ExternalSystemVerifier
 
 # ============================================
 # DAG Configuration
@@ -58,80 +60,29 @@ dag = DAG(
 
 def task_load_from_s3(**context):
     """
-    TASK 1: Load message từ SQS, download file từ S3, decode XML
+    TASK 1: Load file từ S3 và validate XML theo GIAMDINHHS.xsd
     
-    Input: SQS Message với S3 path
-    Output: Raw XML string (đã decode)
+    Input: File từ S3 (hoặc local test file)
+    Output: Raw XML string (đã validate theo XSD)
     """
     logger = logging.getLogger(__name__)
     ti = context['task_instance']
     execution_date = context['execution_date']
     
     logger.info("=" * 80)
-    logger.info(f"TASK 1: LOAD - Starting at {execution_date}")
+    logger.info(f"TASK 1: LOAD & VALIDATE XSD - Starting at {execution_date}")
     logger.info("=" * 80)
     
     try:
-        # Step 1: Receive message từ SQS Queue
-        logger.info("Step 1: Receiving message from SQS...")
+        # Step 1: Load XML file
+        logger.info("Step 1: Loading XML file...")
         
-        # sqs_hook = SqsHook(aws_conn_id='aws_default')
-        # queue_url = Variable.get('bhyt_sqs_queue_url', 
-        #                          'https://sqs.ap-southeast-1.amazonaws.com/123456789/bhyt-xml-queue')
-        
-        # messages = sqs_hook.receive_message(
-        #     queue_url=queue_url,
-        #     max_number_of_messages=1,
-        #     wait_time_seconds=10,
-        #     attribute_names=['All']
-        # )
-        
-        # if not messages or 'Messages' not in messages:
-        #     logger.warning("No messages available in queue")
-        #     raise AirflowFailException("No messages to process")
-        
-        # message = messages['Messages'][0]
-        # message_body = json.loads(message['Body'])
-        # receipt_handle = message['ReceiptHandle']
-        
-        # logger.info(f"Message received: {message['MessageId']}")
-        
-        # # Step 2: Extract S3 information từ message
-        # logger.info("Step 2: Extracting S3 information...")
-        
-        # # Message format có thể là:
-        # # {"bucket": "bhyt-xml-bucket", "key": "2025/10/28/file.xml"}
-        # # hoặc {"Records": [{"s3": {"bucket": {"name": "..."}, "object": {"key": "..."}}}]}
-        
-        # if 'Records' in message_body:
-        #     # S3 Event Notification format
-        #     s3_record = message_body['Records'][0]['s3']
-        #     s3_bucket = s3_record['bucket']['name']
-        #     s3_key = s3_record['object']['key']
-        # else:
-        #     # Simple format
-        #     s3_bucket = message_body.get('bucket')
-        #     s3_key = message_body.get('key')
-        
-        # if not s3_bucket or not s3_key:
-        #     raise ValueError("Missing S3 bucket or key in message")
-        
-        # logger.info(f"S3 Location: s3://{s3_bucket}/{s3_key}")
-        
-        # Step 3: Download file từ S3
-        logger.info("Step 3: Downloading file from S3...")
-        
-        s3_loader = S3FileLoader(
-            aws_access_key=Variable.get('aws_access_key_id', default_var=None),
-            aws_secret_key=Variable.get('aws_secret_access_key', default_var=None),
-            region_name=Variable.get('aws_region', default_var='ap-southeast-1')
-        )
-        
-        # Download và auto-detect encoding/compression
+        # For testing: Load from local file
         file_path = Path(__file__).parent / "test.xml"
         with open(file_path, "rb") as f:
             file_content = f.read()
-        # xml_content = s3_loader.download_and_decode_file(s3_bucket, s3_key)
+        
+        # Decode content
         loader = S3FileLoader(
             aws_access_key="fake",
             aws_secret_key="fake",
@@ -139,34 +90,103 @@ def task_load_from_s3(**context):
         )
         xml_content = loader._detect_and_decode(file_content, filename="test.xml")
         
-        logger.info(f"Successfully downloaded and decoded XML")
+        logger.info(f"Successfully loaded XML file")
         logger.info(f"XML content length: {len(xml_content)} characters")
-        logger.info(xml_content)
-        output_filename = f"loaded_xml_{execution_date.strftime('%Y%m%dT%H%M%S')}.json"
-        with open(output_filename, 'w', encoding='utf-8') as f:
-            json.dump(xml_content, f, ensure_ascii=False, indent=2)
-        # Step 4: Basic XML structure check
-        logger.info("Step 4: Performing basic XML structure check...")
+        logger.info("=" * 80)
+        logger.info(f"{xml_content}")
+        # Step 2: Validate XML theo GIAMDINHHS.xsd
+        logger.info("Step 2: Validating XML against GIAMDINHHS.xsd schema...")
         
-        if not xml_content.strip():
-            raise ValueError("Empty XML content")
+        # Load XSD schema
+        xsd_path = Path(__file__).parent / "XSD" / "GIAMDINHHS.xsd"
+        if not xsd_path.exists():
+            logger.warning(f"XSD file not found at {xsd_path}")
+            raise FileNotFoundError(f"GIAMDINHHS.xsd not found at {xsd_path}")
         
-        if not ('<' in xml_content and '>' in xml_content):
-            raise ValueError("Invalid XML structure - missing angle brackets")
+        with open(xsd_path, 'rb') as xsd_file:
+            xsd_doc = etree.parse(xsd_file)
+            xsd_schema = etree.XMLSchema(xsd_doc)
         
-        # Check for common XML elements
-        required_elements = ['<?xml', '<HOSO', '<TONG_HOP', 'MA_LK']
-        found_elements = [elem for elem in required_elements if elem in xml_content]
+        logger.info(f"✓ XSD schema loaded successfully from {xsd_path}")
         
-        logger.info(f"Found XML elements: {found_elements}")
+        # Parse XML content
+        # Remove BOM if exists
+        if xml_content.startswith('\ufeff'):
+            xml_content = xml_content[1:]
+            logger.info("Removed BOM from XML content")
         
-        # Step 5: Push data to XCom
-        logger.info("Step 5: Pushing data to XCom...")
+        xml_doc = etree.fromstring(xml_content.encode('utf-8'))
+        
+        # Validate XML against XSD
+        is_valid = xsd_schema.validate(xml_doc)
+        
+        if is_valid:
+            logger.info("✓ XML is VALID according to GIAMDINHHS.xsd schema")
+        else:
+            logger.error("✗ XML is INVALID according to GIAMDINHHS.xsd schema")
+            logger.error("Validation errors:")
+            for error in xsd_schema.error_log:
+                logger.error(f"  Line {error.line}: {error.message}")
+            
+            # Raise exception nếu không valid
+            error_messages = [f"Line {err.line}: {err.message}" for err in xsd_schema.error_log]
+            raise AirflowFailException(
+                f"XML validation failed against GIAMDINHHS.xsd:\n" + "\n".join(error_messages[:5])
+            )
+        
+        # Step 3: Basic structure check
+        logger.info("Step 3: Performing basic structure check...")
+        
+        # Check root element
+        if xml_doc.tag != 'GIAMDINHHS':
+            raise ValueError(f"Invalid root element: {xml_doc.tag}, expected GIAMDINHHS")
+        
+        # Check THONGTINDONVI
+        thongtindonvi = xml_doc.find('THONGTINDONVI')
+        if thongtindonvi is not None:
+            ma_lk = thongtindonvi.findtext('MA_LK')
+            logger.info(f"✓ Found MA_LK: {ma_lk}")
+        else:
+            logger.warning("THONGTINDONVI element not found")
+        
+        # Check THONGTINHOSO
+        thongtinhoso = xml_doc.find('THONGTINHOSO')
+        if thongtinhoso is None:
+            raise ValueError("Missing THONGTINHOSO element")
+        
+        ngaylap = thongtinhoso.findtext('NGAYLAP')
+        soluonghoso = thongtinhoso.findtext('SOLUONGHOSO')
+        logger.info(f"✓ NGAYLAP: {ngaylap}")
+        logger.info(f"✓ SOLUONGHOSO: {soluonghoso}")
+        
+        # Check DANHSACHHOSO
+        danhsachhoso = thongtinhoso.find('DANHSACHHOSO')
+        if danhsachhoso is None:
+            raise ValueError("Missing DANHSACHHOSO element")
+        
+        hoso_list = danhsachhoso.findall('HOSO')
+        logger.info(f"✓ Found {len(hoso_list)} HOSO elements")
+        
+        # Count FILEHOSO in each HOSO
+        total_filehoso = 0
+        for idx, hoso in enumerate(hoso_list, 1):
+            filehoso_list = hoso.findall('FILEHOSO')
+            total_filehoso += len(filehoso_list)
+            logger.info(f"  HOSO #{idx}: {len(filehoso_list)} FILEHOSO elements")
+            
+            # Log LOAIHOSO types (không decode NOIDUNGFILE)
+            loaihoso_types = [fh.findtext('LOAIHOSO') for fh in filehoso_list]
+            logger.info(f"    LOAIHOSO: {', '.join(loaihoso_types)}")
+        
+        logger.info(f"✓ Total FILEHOSO elements: {total_filehoso}")
+        
+        # Step 4: Push data to XCom
+        logger.info("Step 4: Pushing data to XCom...")
         
         # Push raw XML content
         ti.xcom_push(key='raw_xml_content', value=xml_content)
         
-        # Push metadata for test context
+        # Push metadata
         metadata = {
             'message_id': 'test-message-id',
             's3_bucket': 'test-bucket',
@@ -176,46 +196,62 @@ def task_load_from_s3(**context):
             'sqs_receipt_handle': None,
             'received_at': datetime.utcnow().isoformat(),
             'message_attributes': {},
-            'test_mode': True
+            'test_mode': True,
+            'xsd_validation': {
+                'schema': 'GIAMDINHHS.xsd',
+                'is_valid': True,
+                'validated_at': datetime.utcnow().isoformat()
+            },
+            'structure_info': {
+                'ma_lk': ma_lk,
+                'ngaylap': ngaylap,
+                'soluonghoso': soluonghoso,
+                'total_hoso': len(hoso_list),
+                'total_filehoso': total_filehoso
+            }
         }
         
         ti.xcom_push(key='file_metadata', value=metadata)
         
         logger.info("=" * 80)
-        logger.info("TASK 1: LOAD - Completed successfully")
-        logger.info(f"Metadata: {json.dumps(metadata, indent=2)}")
+        logger.info("TASK 1: LOAD & VALIDATE XSD - Completed successfully")
+        logger.info(f"✓ XSD Validation: PASSED")
+        logger.info(f"✓ MA_LK: {ma_lk}")
+        logger.info(f"✓ HOSO count: {len(hoso_list)}")
+        logger.info(f"✓ FILEHOSO count: {total_filehoso}")
         logger.info("=" * 80)
         
         return {
             'status': 'success',
+            'xsd_validation': 'passed',
             'file_size': len(xml_content),
-            's3_uri': metadata['s3_uri']
+            's3_uri': metadata['s3_uri'],
+            'hoso_count': len(hoso_list),
+            'filehoso_count': total_filehoso
         }
         
     except Exception as e:
-        logger.error(f"TASK 1: LOAD - Failed with error: {str(e)}")
+        logger.error(f"TASK 1: LOAD & VALIDATE XSD - Failed with error: {str(e)}")
         logger.exception(e)
-        raise AirflowFailException(f"Load task failed: {str(e)}")
+        raise AirflowFailException(f"Load and XSD validation task failed: {str(e)}")
 
 
 # ============================================
-# TASK 2: VALIDATE - Validate XML Structure
+# TASK 2: VALIDATE - Validate Nested XML với XSD
 # ============================================
 
 def task_validate_xml(**context):
     """
-    TASK 2: Validate XML structure và business rules
+    TASK 2: Validate nested XML với XSD tương ứng
     
-    Input: Raw XML string
-    Output: Validation result và parsed XML root
-
-    TASK 2: Validate XML thực tế (không dùng XSD chi tiết)
+    Decode từng nested XML trong <NOIDUNGFILE> và validate với file XSD
+    tương ứng dựa trên giá trị <LOAIHOSO> (XML1, XML2, XML3, v.v.)
     """
     logger = logging.getLogger(__name__)
     ti = context['task_instance']
     
     logger.info("=" * 80)
-    logger.info("TASK 2: VALIDATE - Starting")
+    logger.info("TASK 2: VALIDATE NESTED XML - Starting")
     logger.info("=" * 80)
     
     try:
@@ -230,179 +266,339 @@ def task_validate_xml(**context):
         
         logger.info(f"XML content size: {len(xml_content)} characters")
         
-        # Step 2: XML Syntax Validation (wrapper only)
-        logger.info("Step 2: Validating wrapper XML syntax...")
+        # Step 2: Parse wrapper XML
+        logger.info("Step 2: Parsing wrapper XML...")
         
-        import xml.etree.ElementTree as ET
+        # Remove BOM if exists
+        if xml_content.startswith('\ufeff'):
+            xml_content = xml_content[1:]
+            logger.info("Removed BOM from XML content")
         
-        try:
-            # Remove BOM if exists
-            if xml_content.startswith('\ufeff'):
-                xml_content = xml_content[1:]
-                logger.info("Removed BOM from XML content")
-            
-            # Parse wrapper XML
-            root = ET.fromstring(xml_content.encode('utf-8'))
-            logger.info(f"✓ Wrapper XML parsed successfully. Root element: {root.tag}")
-            
-        except ET.ParseError as e:
-            logger.error(f"XML parsing error: {str(e)}")
-            raise ValueError(f"Invalid XML syntax: {str(e)}")
+        # Parse với lxml
+        root = etree.fromstring(xml_content.encode('utf-8'))
+        logger.info(f"✓ Wrapper XML parsed successfully. Root element: {root.tag}")
         
-        # Step 3: Validate structure (không dùng XSD)
-        logger.info("Step 3: Validating XML structure...")
+        # Step 3: Prepare XSD schema directory
+        logger.info("Step 3: Preparing XSD schema directory...")
+        
+        xsd_dir = Path(__file__).parent / "XSD"
+        if not xsd_dir.exists():
+            raise FileNotFoundError(f"XSD directory not found: {xsd_dir}")
+        
+        logger.info(f"✓ XSD directory: {xsd_dir}")
+        
+        # XSD mapping: LOAIHOSO -> XSD filename
+        xsd_mapping = {
+            'XML1': 'XML1_TONGHOP.xsd',
+            'XML2': 'XML2_CHITIET_THUOC.xsd',
+            'XML3': 'XML3_CHITIET_DVKT.xsd',
+            'XML4': 'XML4_CHITIET_CLS.xsd',
+            'XML5': 'XML5_DIENBIEN_LS.xsd',
+            'XML6': 'XML6_CSDT_HIVAIDS.xsd',
+            'XML7': 'XML7_DUOC_LUU.xsd',
+            'XML8': 'XML8_CHAN_DOAN_HINH_ANH.xsd',
+            'XML9': 'XML9_PHAU_THUAT_THU_THUAT.xsd',
+            'XML10': 'XML10_TRUYEN_MAU.xsd',
+            'XML11': 'XML11_CHI_SO_SINH_TON.xsd',
+            'XML12': 'XML12_THUOC_UNG_THU.xsd',
+            'XML13': 'XML13_PHUC_HOI_CHUC_NANG.xsd',
+            'XML14': 'XML14_VTYT_THAY_THE.xsd',
+            'XML15': 'XML15_GIAI_PHAU_BENH.xsd'
+        }
+        
+        # Step 4: Process each HOSO and validate nested XML
+        logger.info("Step 4: Processing HOSO and validating nested XML...")
         
         validation_errors = []
         validation_warnings = []
+        validation_details = []
         
-        # Check root element
-        if root.tag != 'GIAMDINHHS':
-            validation_errors.append(f"Invalid root element: {root.tag}, expected GIAMDINHHS")
-        
-        # Check THONGTINDONVI
-        thongtindonvi = root.find('THONGTINDONVI')
-        if thongtindonvi is not None:
-            macskcb = thongtindonvi.findtext('MACSKCB')
-            if macskcb:
-                logger.info(f"✓ Found MACSKCB: {macskcb}")
-            else:
-                validation_warnings.append("MACSKCB is empty")
-        
-        # Check THONGTINHOSO
+        # Find all HOSO elements
         thongtinhoso = root.find('THONGTINHOSO')
         if thongtinhoso is None:
-            validation_errors.append("Missing THONGTINHOSO element")
-        else:
-            ngaylap = thongtinhoso.findtext('NGAYLAP')
-            soluonghoso = thongtinhoso.findtext('SOLUONGHOSO')
+            raise ValueError("Missing THONGTINHOSO element")
+        
+        danhsachhoso = thongtinhoso.find('DANHSACHHOSO')
+        if danhsachhoso is None:
+            raise ValueError("Missing DANHSACHHOSO element")
+        
+        hoso_list = danhsachhoso.findall('HOSO')
+        logger.info(f"Found {len(hoso_list)} HOSO elements")
+        
+        total_validated = 0
+        total_passed = 0
+        total_failed = 0
+        
+        # Process each HOSO
+        for hoso_idx, hoso in enumerate(hoso_list, 1):
+            logger.info(f"\n{'='*60}")
+            logger.info(f"Processing HOSO #{hoso_idx}")
+            logger.info(f"{'='*60}")
             
-            logger.info(f"✓ NGAYLAP: {ngaylap}")
-            logger.info(f"✓ SOLUONGHOSO: {soluonghoso}")
+            filehoso_list = hoso.findall('FILEHOSO')
+            logger.info(f"Found {len(filehoso_list)} FILEHOSO in HOSO #{hoso_idx}")
             
-            # Check DANHSACHHOSO
-            danhsachhoso = thongtinhoso.find('DANHSACHHOSO')
-            if danhsachhoso is None:
-                validation_errors.append("Missing DANHSACHHOSO element")
-            else:
-                hoso_list = danhsachhoso.findall('HOSO')
-                logger.info(f"✓ Found {len(hoso_list)} HOSO elements")
+            # Process each FILEHOSO
+            for filehoso_idx, filehoso in enumerate(filehoso_list, 1):
+                loaihoso = filehoso.findtext('LOAIHOSO')
+                noidungfile_base64 = filehoso.findtext('NOIDUNGFILE', '').strip()
                 
-                # Validate each HOSO
-                for idx, hoso in enumerate(hoso_list, 1):
-                    filehoso_list = hoso.findall('FILEHOSO')
-                    logger.info(f"✓ HOSO #{idx}: Contains {len(filehoso_list)} FILEHOSO")
+                if not loaihoso:
+                    validation_warnings.append(f"HOSO #{hoso_idx}, FILEHOSO #{filehoso_idx}: Missing LOAIHOSO")
+                    continue
+                
+                logger.info(f"\n  Processing FILEHOSO #{filehoso_idx}: {loaihoso}")
+                
+                if not noidungfile_base64:
+                    validation_warnings.append(f"HOSO #{hoso_idx}, {loaihoso}: Empty NOIDUNGFILE")
+                    logger.warning(f"  ⚠ {loaihoso}: Empty NOIDUNGFILE")
+                    continue
+                
+                try:
+                    # Decode base64 content
+                    logger.info(f"  Decoding base64 content ({len(noidungfile_base64)} chars)...")
                     
-                    xml_types = []
-                    for filehoso in filehoso_list:
-                        loaihoso = filehoso.findtext('LOAIHOSO')
-                        noidungfile = filehoso.findtext('NOIDUNGFILE', '')
+                    import base64
+                    decoded_bytes = base64.b64decode(noidungfile_base64)
+                    nested_xml = decoded_bytes.decode('utf-8')
+                    
+                    # Remove BOM from nested XML if exists
+                    if nested_xml.startswith('\ufeff'):
+                        nested_xml = nested_xml[1:]
+                    
+                    logger.info(f"  ✓ Decoded to {len(nested_xml)} characters")
+                    
+                    # Get corresponding XSD file
+                    xsd_filename = xsd_mapping.get(loaihoso)
+                    if not xsd_filename:
+                        validation_warnings.append(f"HOSO #{hoso_idx}, {loaihoso}: No XSD mapping found")
+                        logger.warning(f"  ⚠ No XSD mapping for {loaihoso}")
+                        continue
+                    
+                    xsd_path = xsd_dir / xsd_filename
+                    if not xsd_path.exists():
+                        validation_warnings.append(f"HOSO #{hoso_idx}, {loaihoso}: XSD file not found ({xsd_filename})")
+                        logger.warning(f"  ⚠ XSD file not found: {xsd_path}")
+                        continue
+                    
+                    # Load XSD schema
+                    logger.info(f"  Loading XSD schema: {xsd_filename}")
+                    with open(xsd_path, 'rb') as xsd_file:
+                        xsd_doc = etree.parse(xsd_file)
+                        xsd_schema = etree.XMLSchema(xsd_doc)
+                    
+                    # Parse nested XML
+                    logger.info(f"  Parsing nested XML...")
+                    nested_root = etree.fromstring(nested_xml.encode('utf-8'))
+                    logger.info(f"  ✓ Parsed nested XML: <{nested_root.tag}>")
+                    
+                    # Validate nested XML against XSD
+                    logger.info(f"  Validating against {xsd_filename}...")
+                    is_valid = xsd_schema.validate(nested_root)
+                    
+                    total_validated += 1
+                    
+                    if is_valid:
+                        total_passed += 1
+                        logger.info(f"  ✓ {loaihoso} validation PASSED")
                         
-                        if loaihoso:
-                            xml_types.append(loaihoso)
-                            logger.info(f"  - {loaihoso}: {len(noidungfile)} characters")
+                        validation_details.append({
+                            'hoso_index': hoso_idx,
+                            'filehoso_index': filehoso_idx,
+                            'loaihoso': loaihoso,
+                            'xsd_file': xsd_filename,
+                            'status': 'PASSED',
+                            'root_element': nested_root.tag,
+                            'xml_size': len(nested_xml)
+                        })
+                    else:
+                        total_failed += 1
+                        logger.error(f"  ✗ {loaihoso} validation FAILED")
+                        
+                        # Collect validation errors
+                        error_messages = []
+                        for error in xsd_schema.error_log:
+                            error_msg = f"Line {error.line}: {error.message}"
+                            error_messages.append(error_msg)
+                            logger.error(f"    {error_msg}")
+                        
+                        validation_errors.append({
+                            'hoso_index': hoso_idx,
+                            'filehoso_index': filehoso_idx,
+                            'loaihoso': loaihoso,
+                            'xsd_file': xsd_filename,
+                            'error_messages': error_messages[:5]  # First 5 errors
+                        })
+                        
+                        validation_details.append({
+                            'hoso_index': hoso_idx,
+                            'filehoso_index': filehoso_idx,
+                            'loaihoso': loaihoso,
+                            'xsd_file': xsd_filename,
+                            'status': 'FAILED',
+                            'root_element': nested_root.tag,
+                            'xml_size': len(nested_xml),
+                            'error_count': len(xsd_schema.error_log)
+                        })
+                    
+                except base64.binascii.Error as decode_error:
+                    validation_errors.append({
+                        'hoso_index': hoso_idx,
+                        'filehoso_index': filehoso_idx,
+                        'loaihoso': loaihoso,
+                        'error_messages': [f"Base64 decode error: {str(decode_error)}"]
+                    })
+                    logger.error(f"  ✗ Base64 decode error: {str(decode_error)}")
+                    
+                except etree.XMLSyntaxError as parse_error:
+                    validation_errors.append({
+                        'hoso_index': hoso_idx,
+                        'filehoso_index': filehoso_idx,
+                        'loaihoso': loaihoso,
+                        'error_messages': [f"XML parse error: {str(parse_error)}"]
+                    })
+                    logger.error(f"  ✗ XML parse error: {str(parse_error)}")
+                    
+                except Exception as nested_error:
+                    validation_errors.append({
+                        'hoso_index': hoso_idx,
+                        'filehoso_index': filehoso_idx,
+                        'loaihoso': loaihoso,
+                        'error_messages': [f"Unexpected error: {str(nested_error)}"]
+                    })
+                    logger.error(f"  ✗ Unexpected error: {str(nested_error)}")
+        
+        # Step 5: Decode all nested XML in wrapper XML
+        logger.info("\n" + "=" * 80)
+        logger.info("Step 5: Decoding all nested XML in xml_content...")
+        logger.info("=" * 80)
+        
+        # Parse xml_content để modify trực tiếp
+        root_to_modify = etree.fromstring(xml_content.encode('utf-8'))
+        
+        # Find all FILEHOSO and replace base64 with decoded XML
+        thongtinhoso_modify = root_to_modify.find('THONGTINHOSO')
+        if thongtinhoso_modify is not None:
+            danhsachhoso_modify = thongtinhoso_modify.find('DANHSACHHOSO')
+            if danhsachhoso_modify is not None:
+                hoso_list_modify = danhsachhoso_modify.findall('HOSO')
+                
+                decode_count = 0
+                for hoso in hoso_list_modify:
+                    filehoso_list_modify = hoso.findall('FILEHOSO')
+                    
+                    for filehoso in filehoso_list_modify:
+                        loaihoso = filehoso.findtext('LOAIHOSO')
+                        noidungfile_elem = filehoso.find('NOIDUNGFILE')
+                        
+                        if noidungfile_elem is not None and noidungfile_elem.text:
+                            noidungfile_base64 = noidungfile_elem.text.strip()
                             
-                            # Validate nested XML syntax
-                            if noidungfile.strip():
+                            if noidungfile_base64:
                                 try:
-                                    # Remove BOM from nested XML
-                                    nested_xml = noidungfile.strip()
+                                    # Decode base64
+                                    import base64
+                                    decoded_bytes = base64.b64decode(noidungfile_base64)
+                                    nested_xml = decoded_bytes.decode('utf-8')
+                                    
+                                    # Remove BOM if exists
                                     if nested_xml.startswith('\ufeff'):
                                         nested_xml = nested_xml[1:]
                                     
-                                    nested_root = ET.fromstring(nested_xml.encode('utf-8'))
-                                    logger.info(f"    ✓ {loaihoso} nested XML valid: <{nested_root.tag}>")
+                                    # Remove XML declaration from nested XML (để tránh conflict)
+                                    nested_xml = re.sub(r'<\?xml[^?]*\?>\s*', '', nested_xml)
                                     
-                                    # Count elements in nested XML
-                                    if loaihoso == 'XML1':
-                                        ma_lk = nested_root.findtext('MA_LK')
-                                        ho_ten = nested_root.findtext('HO_TEN')
-                                        ma_the = nested_root.findtext('MA_THE_BHYT')
-                                        if not ma_the:
-                                            ma_the = nested_root.findtext('MA_THE')
-                                        
-                                        logger.info(f"    MA_LK: {ma_lk}")
-                                        logger.info(f"    HO_TEN: {ho_ten}")
-                                        logger.info(f"    MA_THE: {ma_the}")
-                                        
-                                        if not ma_lk:
-                                            validation_errors.append(f"{loaihoso}: Missing MA_LK")
-                                        
-                                    elif loaihoso == 'XML2':
-                                        thuoc_count = len(nested_root.findall('.//CHI_TIET_THUOC'))
-                                        logger.info(f"    Chi tiết thuốc: {thuoc_count} records")
-                                        
-                                    elif loaihoso == 'XML3':
-                                        dvkt_count = len(nested_root.findall('.//CHI_TIET_DVKT'))
-                                        logger.info(f"    Chi tiết DVKT: {dvkt_count} records")
-                                        
-                                    elif loaihoso == 'XML4':
-                                        cls_count = len(nested_root.findall('.//CHI_TIET_CLS'))
-                                        logger.info(f"    Chi tiết CLS: {cls_count} records")
-                                        
-                                    elif loaihoso == 'XML5':
-                                        dbls_count = len(nested_root.findall('.//CHI_TIET_DIEN_BIEN_BENH'))
-                                        if dbls_count == 0:
-                                            dbls_count = len(nested_root.findall('.//DIEN_BIEN_LAM_SANG'))
-                                        logger.info(f"    Diễn biến lâm sàng: {dbls_count} records")
+                                    # Clear existing content
+                                    noidungfile_elem.text = None
+                                    noidungfile_elem.tail = None
+                                    # Remove all children
+                                    for child in list(noidungfile_elem):
+                                        noidungfile_elem.remove(child)
                                     
-                                except ET.ParseError as nested_error:
-                                    validation_errors.append(f"{loaihoso} nested XML invalid: {str(nested_error)}")
-                                    logger.error(f"    ✗ {loaihoso} nested XML parse error: {str(nested_error)}")
-                            else:
-                                validation_warnings.append(f"{loaihoso} has empty NOIDUNGFILE")
-                    
-                    logger.info(f"  XML types in HOSO #{idx}: {', '.join(xml_types)}")
+                                    # Parse nested XML and add as child elements
+                                    try:
+                                        nested_root = etree.fromstring(nested_xml.encode('utf-8'))
+                                        # Append nested XML as child of NOIDUNGFILE
+                                        noidungfile_elem.append(nested_root)
+                                        decode_count += 1
+                                        logger.info(f"  ✓ Decoded {loaihoso} in xml_content (as XML child)")
+                                    except etree.XMLSyntaxError as parse_err:
+                                        # If parsing fails, use CDATA section as fallback
+                                        logger.warning(f"  ⚠ Cannot parse {loaihoso} as XML, using text: {str(parse_err)}")
+                                        noidungfile_elem.text = nested_xml
+                                    
+                                except Exception as decode_err:
+                                    logger.warning(f"  ⚠ Failed to decode {loaihoso}: {str(decode_err)}")
+                
+                logger.info(f"\n✓ Successfully decoded {decode_count} nested XML in xml_content")
         
-        # Step 4: Business rules validation
-        logger.info("Step 4: Validating business rules...")
-        
-        # Additional validations can be added here
-        
-        # Step 5: Determine validation status
+        # Convert back to string và gán lại vào xml_content
+        xml_content = etree.tostring(root_to_modify, encoding='utf-8', xml_declaration=True).decode('utf-8')
+        logger.info(f"Final xml_content size: {len(xml_content)} characters")
+        # Step 6: Determine overall validation status
+        logger.info("\n" + "=" * 80)
+        logger.info("VALIDATION SUMMARY")
+        logger.info("=" * 80)
+        output_filename = f"rte.json"
+       
+        with open(output_filename, 'w', encoding='utf-8') as f:
+            json.dump(xml_content, f, ensure_ascii=False, indent=2)
         is_valid = len(validation_errors) == 0
         
+        logger.info(f"Total nested XML validated: {total_validated}")
+        logger.info(f"✓ Passed: {total_passed}")
+        logger.info(f"✗ Failed: {total_failed}")
+        logger.info(f"⚠ Warnings: {len(validation_warnings)}")
+        
         if validation_errors:
-            logger.error(f"Validation FAILED with {len(validation_errors)} errors:")
-            for error in validation_errors:
-                logger.error(f"  - {error}")
+            logger.error(f"\nValidation FAILED with {len(validation_errors)} errors:")
+            for error in validation_errors[:10]:  # Show first 10 errors
+                logger.error(f"  - HOSO #{error['hoso_index']}, {error['loaihoso']}: {error['error_messages'][0] if error['error_messages'] else 'Unknown error'}")
         else:
-            logger.info("✓ All validations passed")
+            logger.info("\n✓ All nested XML validations PASSED")
         
         if validation_warnings:
-            logger.warning(f"Validation has {len(validation_warnings)} warnings:")
-            for warning in validation_warnings:
+            logger.warning(f"\nValidation has {len(validation_warnings)} warnings:")
+            for warning in validation_warnings[:10]:  # Show first 10 warnings
                 logger.warning(f"  - {warning}")
         
-        # Step 6: Push validation results to XCom
-        logger.info("Step 6: Pushing validation results to XCom...")
+        # Step 7: Push validation results to XCom
+        logger.info("\nStep 7: Pushing validation results to XCom...")
         
         validation_result = {
             'is_valid': is_valid,
             'validation_status': 'PASSED' if is_valid else 'FAILED',
+            'total_validated': total_validated,
+            'total_passed': total_passed,
+            'total_failed': total_failed,
             'error_count': len(validation_errors),
             'warning_count': len(validation_warnings),
             'errors': validation_errors,
             'warnings': validation_warnings,
+            'validation_details': validation_details,
             'validated_at': datetime.utcnow().isoformat()
         }
         
         ti.xcom_push(key='validation_result', value=validation_result)
+        
+        # Push decoded XML (xml_content đã được decode tất cả nested XML)
         ti.xcom_push(key='validated_xml', value=xml_content)
+        logger.info(f"Pushed decoded XML to XCom ({len(xml_content)} characters)")
         
         logger.info("=" * 80)
-        logger.info(f"TASK 2: VALIDATE - Completed")
+        logger.info(f"TASK 2: VALIDATE NESTED XML - Completed")
         logger.info(f"Status: {'✓ PASSED' if is_valid else '✗ FAILED'}")
-        logger.info(f"Errors: {len(validation_errors)}, Warnings: {len(validation_warnings)}")
+        logger.info(f"Validated: {total_validated}, Passed: {total_passed}, Failed: {total_failed}")
         logger.info("=" * 80)
         
         # Nếu có quá nhiều lỗi nghiêm trọng, raise exception
         if not is_valid and len(validation_errors) > 10:
-            raise AirflowFailException(f"Validation failed with {len(validation_errors)} critical errors")
+            raise AirflowFailException(f"Validation failed with {len(validation_errors)} nested XML errors")
         
         return validation_result
         
     except Exception as e:
-        logger.error(f"TASK 2: VALIDATE - Failed with error: {str(e)}")
+        logger.error(f"TASK 2: VALIDATE NESTED XML - Failed with error: {str(e)}")
         logger.exception(e)
         raise
 
@@ -447,7 +643,8 @@ def task_transform_to_dto(**context):
         logger.info("Step 3: Transforming XML to DTO structure...")
         
         dto = transformer.transform_complete_xml(xml_content)
-        
+        logger.info(f"✓ Transformation to DTO completed")
+        logger.info(f"{dto}")
         logger.info(f"Transformation completed successfully")
         logger.info(f"DTO resource type: {dto['resourceType']}")
         logger.info(f"DTO standard: {dto['standard']}")
@@ -455,21 +652,25 @@ def task_transform_to_dto(**context):
         # Step 4: Extract key information
         logger.info("Step 4: Extracting key information...")
         
-        tonghop = dto.get('tonghop', {})
-        
+        tonghop = dto.get('xml1_tonghop', {})
+        logger.info(f"{tonghop}")
+        if isinstance(tonghop, list) and len(tonghop) > 0:
+            tonghop_item = tonghop[0]
+        else:
+            tonghop_item = {}
         key_info = {
-            'MA_LK': tonghop.get('MA_LK'),
-            'MA_BN': tonghop.get('MA_BN'),
-            'HO_TEN': tonghop.get('HO_TEN'),
-            'NGAY_SINH': tonghop.get('NGAY_SINH'),
-            'GIOI_TINH': tonghop.get('GIOI_TINH'),
-            'MA_THE': tonghop.get('MA_THE'),
-            'MA_CSKCB': tonghop.get('MA_CSKCB'),
-            'NGAY_VAO': tonghop.get('NGAY_VAO'),
-            'NGAY_RA': tonghop.get('NGAY_RA'),
-            'T_TONGCHI': tonghop.get('T_TONGCHI'),
-            'T_BHTT': tonghop.get('T_BHTT'),
-            'T_BNTT': tonghop.get('T_BNTT')
+            'MA_LK': tonghop_item.get('MA_LK'),
+            'MA_BN': tonghop_item.get('MA_BN'),
+            'HO_TEN': tonghop_item.get('HO_TEN'),
+            'NGAY_SINH': tonghop_item.get('NGAY_SINH'),
+            'GIOI_TINH': tonghop_item.get('GIOI_TINH'),
+            'MA_THE': tonghop_item.get('MA_THE_BHYT'),  
+            'MA_CSKCB': tonghop_item.get('MA_CSKCB'),
+            'NGAY_VAO': tonghop_item.get('NGAY_VAO'),
+            'NGAY_RA': tonghop_item.get('NGAY_RA'),
+            'T_TONGCHI': tonghop_item.get('T_TONGCHI'),
+            'T_BHTT': tonghop_item.get('T_BHTT'),
+            'T_BNTT': tonghop_item.get('T_BNTT'),
         }
         
         logger.info("Key information extracted:")
@@ -535,10 +736,10 @@ def task_transform_to_dto(**context):
 
 def task_verify_external_system(**context):
     """
-    TASK 4: Verify DTO với external systems (MOCK DATA)
+    TASK 4: Verify DTO với external systems và data integrity
     
-    Input: Complete DTO
-    Output: Verification results từ external systems
+    Input: Complete DTO từ Task 3, Validation results từ Task 2
+    Output: Verification results từ external systems và integrity checks
     """
     logger = logging.getLogger(__name__)
     ti = context['task_instance']
@@ -548,19 +749,60 @@ def task_verify_external_system(**context):
     logger.info("=" * 80)
     
     try:
-        # Step 1: Pull DTO from previous task
-        logger.info("Step 1: Pulling DTO from previous task...")
+        # Step 1: Pull DTO and validation results from previous tasks
+        logger.info("Step 1: Pulling data from previous tasks...")
         
         dto = ti.xcom_pull(task_ids='transform_to_dto', key='complete_dto')
         dto_summary = ti.xcom_pull(task_ids='transform_to_dto', key='dto_summary')
+        validation_result = ti.xcom_pull(task_ids='validate_xml', key='validation_result')
         
         if not dto:
             raise ValueError("No DTO received from transform task")
         
-        tonghop = dto.get('tonghop', {})
+        # Extract tonghop correctly - DTO structure uses 'xml1_tonghop' and it's a list
+        xml1_tonghop_list = dto.get('xml1_tonghop', [])
+        if isinstance(xml1_tonghop_list, list) and len(xml1_tonghop_list) > 0:
+            tonghop = xml1_tonghop_list[0]
+        else:
+            tonghop = {}
         
-        # Step 2: Verify Patient Identity (MOCK)
-        logger.info("Step 2: Verifying patient identity with National ID System (MOCK)...")
+        logger.info(f"DTO received: MA_LK = {tonghop.get('MA_LK')}")
+        logger.info(f"Patient: {tonghop.get('HO_TEN')}")
+        logger.info(f"Validation status from Task 2: {validation_result.get('validation_status')}")
+        logger.info(f"Total validated nested XML: {validation_result.get('total_validated', 0)}")
+        
+        # Step 2: Data Integrity Check
+        logger.info("\nStep 2: Performing data integrity checks...")
+        
+        integrity_checks = {
+            'ma_lk_present': bool(tonghop.get('MA_LK')),
+            'patient_info_complete': all([
+                tonghop.get('HO_TEN'),
+                tonghop.get('NGAY_SINH'),
+                tonghop.get('MA_THE_BHYT')
+            ]),
+            'cost_data_present': all([
+                tonghop.get('T_TONGCHI') is not None,
+                tonghop.get('T_BHTT') is not None,
+                tonghop.get('T_BNTT') is not None
+            ]),
+            'detail_records_present': any([
+                len(dto.get('xml2_chitiet_thuoc', [])) > 0,
+                len(dto.get('xml3_chitiet_dvkt', [])) > 0,
+                len(dto.get('xml4_chitiet_cls', [])) > 0
+            ]),
+            'xml_validation_passed': validation_result.get('is_valid', False)
+        }
+        
+        integrity_score = sum(integrity_checks.values()) / len(integrity_checks) * 100
+        logger.info(f"Data integrity score: {integrity_score:.1f}%")
+        
+        for check_name, result in integrity_checks.items():
+            status = "✓" if result else "✗"
+            logger.info(f"  {status} {check_name}: {'PASS' if result else 'FAIL'}")
+        
+        # Step 3: Verify Patient Identity (MOCK)
+        logger.info("\nStep 3: Verifying patient identity with National ID System (MOCK)...")
         
         patient_verification = verify_patient_identity_mock(
             ma_bn=tonghop.get('MA_BN'),
@@ -570,10 +812,10 @@ def task_verify_external_system(**context):
         )
         
         logger.info(f"Patient verification: {patient_verification['status']}")
-        logger.info(f"Match score: {patient_verification['match_score']}")
+        logger.info(f"Match score: {patient_verification['match_score']:.2f}")
         
-        # Step 3: Verify BHYT Card (MOCK)
-        logger.info("Step 3: Verifying BHYT card with BHXH Portal (MOCK)...")
+        # Step 4: Verify BHYT Card (MOCK)
+        logger.info("\nStep 4: Verifying BHYT card with BHXH Portal (MOCK)...")
         
         card_verification = verify_bhyt_card_mock(
             ma_the=tonghop.get('MA_THE'),
@@ -587,8 +829,8 @@ def task_verify_external_system(**context):
         logger.info(f"Card is {'VALID' if card_verification['is_valid'] else 'INVALID'}")
         logger.info(f"Coverage: {card_verification['coverage_info']['coverage_percentage']}%")
         
-        # Step 4: Verify Facility Registration (MOCK)
-        logger.info("Step 4: Verifying facility registration (MOCK)...")
+        # Step 5: Verify Facility Registration (MOCK)
+        logger.info("\nStep 5: Verifying facility registration (MOCK)...")
         
         facility_verification = verify_facility_mock(
             ma_cskcb=tonghop.get('MA_CSKCB'),
@@ -598,26 +840,26 @@ def task_verify_external_system(**context):
         logger.info(f"Facility verification: {facility_verification['status']}")
         logger.info(f"Facility name: {facility_verification['facility_info']['facility_name']}")
         
-        # Step 5: Verify Medication Codes (MOCK - Sample only)
-        logger.info("Step 5: Verifying medication codes (MOCK - sample)...")
+        # Step 6: Verify Medication Codes (MOCK - Sample only)
+        logger.info("\nStep 6: Verifying medication codes (MOCK - sample)...")
         
-        thuoc_list = dto.get('chitiet_thuoc', [])
+        thuoc_list = dto.get('xml2_chitiet_thuoc', [])
         medication_verification = verify_medications_mock(thuoc_list[:5])  # Sample first 5
         
         logger.info(f"Verified {len(medication_verification['verified_items'])} medications")
         logger.info(f"Valid: {medication_verification['valid_count']}, "
                    f"Invalid: {medication_verification['invalid_count']}")
         
-        # Step 6: Verify Service Codes (MOCK - Sample only)
-        logger.info("Step 6: Verifying service codes (MOCK - sample)...")
+        # Step 7: Verify Service Codes (MOCK - Sample only)
+        logger.info("\nStep 7: Verifying service codes (MOCK - sample)...")
         
-        dvkt_list = dto.get('chitiet_dvkt', [])
+        dvkt_list = dto.get('xml3_chitiet_dvkt', [])
         service_verification = verify_services_mock(dvkt_list[:5])  # Sample first 5
         
         logger.info(f"Verified {len(service_verification['verified_items'])} services")
         
-        # Step 7: Cross-check Cost Calculation (MOCK)
-        logger.info("Step 7: Cross-checking cost calculation...")
+        # Step 8: Cross-check Cost Calculation (MOCK)
+        logger.info("\nStep 8: Cross-checking cost calculation...")
         
         cost_verification = verify_cost_calculation_mock(
             t_tongchi=tonghop.get('T_TONGCHI'),
@@ -631,16 +873,29 @@ def task_verify_external_system(**context):
         )
         
         logger.info(f"Cost verification: {cost_verification['status']}")
-        logger.info(f"Discrepancy: {cost_verification['discrepancy_amount']} VND")
+        logger.info(f"Discrepancy: {cost_verification['discrepancy_amount']:.2f} VND")
         
-        # Step 8: Compile verification results
-        logger.info("Step 8: Compiling verification results...")
+        # Step 9: Compile verification results
+        logger.info("\nStep 9: Compiling verification results...")
         
         verification_results = {
             'overall_status': 'VERIFIED',
             'verification_timestamp': datetime.utcnow().isoformat(),
             'ma_lk': tonghop.get('MA_LK'),
             
+            # Data integrity
+            'data_integrity': {
+                'integrity_score': integrity_score,
+                'checks': integrity_checks,
+                'xml_validation_summary': {
+                    'total_validated': validation_result.get('total_validated', 0),
+                    'total_passed': validation_result.get('total_passed', 0),
+                    'total_failed': validation_result.get('total_failed', 0),
+                    'status': validation_result.get('validation_status', 'UNKNOWN')
+                }
+            },
+            
+            # External verifications
             'verifications': {
                 'patient_identity': patient_verification,
                 'bhyt_card': card_verification,
@@ -803,7 +1058,7 @@ def task_output_json(**context):
         # Step 5: Send JSON to API endpoint
         logger.info("Step 5: Sending JSON to API endpoint...")
         
-        api_endpoint = Variable.get('bhyt_api_endpoint', 'https://localhost:44315/api/app/files/test')
+        api_endpoint = Variable.get('bhyt_api_endpoint', 'https://localhost:44380/api/app/files/test')
         
         api_response = send_json_to_api(
             endpoint_url=api_endpoint,
@@ -1287,6 +1542,19 @@ def verify_cost_calculation_mock(t_tongchi: float, t_bhtt: float,
                                  detail_records: dict) -> dict:
     """Mock cost calculation verification"""
     import random
+    
+    # Handle None values
+    if t_tongchi is None or t_tongchi == 0:
+        return {
+            'status': 'warning',
+            'declared_total': t_tongchi,
+            'calculated_total': 0,
+            'discrepancy_amount': 0,
+            'discrepancy_percentage': 0,
+            'cost_breakdown_verified': False,
+            'verification_source': 'Cost Verification Engine (MOCK)',
+            'warning_message': 'Total cost (T_TONGCHI) is None or zero'
+        }
     
     # Calculate from details (simplified)
     calculated_total = t_tongchi * random.uniform(0.98, 1.02)

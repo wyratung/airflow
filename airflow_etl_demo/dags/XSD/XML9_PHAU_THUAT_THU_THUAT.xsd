@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema" elementFormDefault="qualified">
+  
+  <xs:element name="CHITIEU_CHITIET_THUTHUAT_PHAUTHUAT">
+    <xs:complexType>
+      <xs:sequence>
+        <xs:element name="DSACH_CHI_TIET_PTTT">
+          <xs:complexType>
+            <xs:sequence>
+              <xs:element name="CHI_TIET_PTTT" type="ChiTietPTTTType" maxOccurs="unbounded"/>
+            </xs:sequence>
+          </xs:complexType>
+        </xs:element>
+      </xs:sequence>
+    </xs:complexType>
+  </xs:element>
+
+  <xs:complexType name="ChiTietPTTTType">
+    <xs:sequence>
+      <xs:element name="MA_LK" type="xs:string"/>
+      <xs:element name="STT" type="xs:integer"/>
+      <xs:element name="MA_PTTT" type="xs:string"/>
+      <xs:element name="TEN_PTTT" type="xs:string"/>
+      <xs:element name="LOAI_PTTT" type="xs:integer"/>
+      <xs:element name="MA_BAC_SI_CHINH" type="xs:string" minOccurs="0"/>
+      <xs:element name="MA_BAC_SI_PHU_1" type="xs:string" minOccurs="0"/>
+      <xs:element name="MA_BAC_SI_PHU_2" type="xs:string" minOccurs="0"/>
+      <xs:element name="MA_BAC_SI_GAY_ME" type="xs:string" minOccurs="0"/>
+      <xs:element name="PHUONG_PHAP_VO_CAM" type="xs:integer" minOccurs="0"/>
+      <xs:element name="VI_TRI_THUC_HIEN" type="xs:integer" minOccurs="0"/>
+      <xs:element name="NGAY_BAT_DAU" type="xs:string"/>
+      <xs:element name="NGAY_KET_THUC" type="xs:string" minOccurs="0"/>
+      <xs:element name="MA_BENH_TRUOC_PT" type="xs:string" minOccurs="0"/>
+      <xs:element name="MA_BENH_SAU_PT" type="xs:string" minOccurs="0"/>
+      <xs:element name="MO_TA_PTTT" type="xs:string" minOccurs="0"/>
+      <xs:element name="KET_QUA_PTTT" type="xs:string" minOccurs="0"/>
+      <xs:element name="BIEN_CHUNG" type="xs:string" minOccurs="0"/>
+      <xs:element name="LUONG_MAU_MAT" type="xs:decimal" minOccurs="0"/>
+      <xs:element name="PHUONG_PHAP_PTTT" type="xs:string" minOccurs="0"/>
+      <xs:element name="DU_PHONG" type="xs:string" minOccurs="0"/>
+    </xs:sequence>
+  </xs:complexType>
+
+</xs:schema>

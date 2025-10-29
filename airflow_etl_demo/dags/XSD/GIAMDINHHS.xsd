@@ -1,0 +1,67 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema" elementFormDefault="qualified">
+  
+  <xs:element name="GIAMDINHHS">
+    <xs:complexType>
+      <xs:sequence>
+        <xs:element name="THONGTINDONVI" type="ThongTinDonViType"/>
+        <xs:element name="THONGTINHOSO" type="ThongTinHoSoType"/>
+        <xs:element name="CHUKYDONVI" type="xs:string" minOccurs="0"/>
+      </xs:sequence>
+    </xs:complexType>
+  </xs:element>
+
+  <xs:complexType name="ThongTinDonViType">
+    <xs:sequence>
+      <xs:element name="MACSKCB" type="xs:string"/>
+    </xs:sequence>
+  </xs:complexType>
+
+  <xs:complexType name="ThongTinHoSoType">
+    <xs:sequence>
+      <xs:element name="NGAYLAP" type="xs:string"/>
+      <xs:element name="SOLUONGHOSO" type="xs:integer"/>
+      <xs:element name="DANHSACHHOSO" type="DanhSachHoSoType"/>
+    </xs:sequence>
+  </xs:complexType>
+
+  <xs:complexType name="DanhSachHoSoType">
+    <xs:sequence>
+      <xs:element name="HOSO" maxOccurs="unbounded">
+        <xs:complexType>
+          <xs:sequence>
+            <xs:element name="FILEHOSO" minOccurs="1" maxOccurs="15">
+              <xs:complexType>
+                <xs:sequence>
+                  <xs:element name="LOAIHOSO">
+                    <xs:simpleType>
+                      <xs:restriction base="xs:string">
+                        <xs:enumeration value="XML1"/>
+                        <xs:enumeration value="XML2"/>
+                        <xs:enumeration value="XML3"/>
+                        <xs:enumeration value="XML4"/>
+                        <xs:enumeration value="XML5"/>
+                        <xs:enumeration value="XML6"/>
+                        <xs:enumeration value="XML7"/>
+                        <xs:enumeration value="XML8"/>
+                        <xs:enumeration value="XML9"/>
+                        <xs:enumeration value="XML10"/>
+                        <xs:enumeration value="XML11"/>
+                        <xs:enumeration value="XML12"/>
+                        <xs:enumeration value="XML13"/>
+                        <xs:enumeration value="XML14"/>
+                        <xs:enumeration value="XML15"/>
+                      </xs:restriction>
+                    </xs:simpleType>
+                  </xs:element>
+                  <xs:element name="NOIDUNGFILE" type="xs:string"/>
+                </xs:sequence>
+              </xs:complexType>
+            </xs:element>
+          </xs:sequence>
+        </xs:complexType>
+      </xs:element>
+    </xs:sequence>
+  </xs:complexType>
+
+</xs:schema>

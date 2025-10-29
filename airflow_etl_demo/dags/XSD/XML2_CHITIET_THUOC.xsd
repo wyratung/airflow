@@ -1,0 +1,62 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema" elementFormDefault="qualified">
+  
+  <xs:element name="CHITIEU_CHITIET_THUOC">
+    <xs:complexType>
+      <xs:sequence>
+        <xs:element name="DSACH_CHI_TIET_THUOC">
+          <xs:complexType>
+            <xs:sequence>
+              <xs:element name="CHI_TIET_THUOC" type="ChiTietThuocType" maxOccurs="unbounded"/>
+            </xs:sequence>
+          </xs:complexType>
+        </xs:element>
+      </xs:sequence>
+    </xs:complexType>
+  </xs:element>
+
+  <xs:complexType name="ChiTietThuocType">
+    <xs:sequence>
+      <xs:element name="MA_LK" type="xs:string"/>
+      <xs:element name="STT" type="xs:integer"/>
+      <xs:element name="MA_THUOC" type="xs:string"/>
+      <xs:element name="MA_PP_CHEBIEN" type="xs:string" minOccurs="0"/>
+      <xs:element name="MA_CSKCB_THUOC" type="xs:string" minOccurs="0"/>
+      <xs:element name="MA_NHOM" type="xs:integer" minOccurs="0"/>
+      <xs:element name="TEN_THUOC" type="xs:string"/>
+      <xs:element name="DON_VI_TINH" type="xs:string"/>
+      <xs:element name="HAM_LUONG" type="xs:string" minOccurs="0"/>
+      <xs:element name="DUONG_DUNG" type="xs:string" minOccurs="0"/>
+      <xs:element name="DANG_BAO_CHE" type="xs:string" minOccurs="0"/>
+      <xs:element name="LIEU_DUNG" type="xs:string" minOccurs="0"/>
+      <xs:element name="CACH_DUNG" type="xs:string" minOccurs="0"/>
+      <xs:element name="SO_DANG_KY" type="xs:string" minOccurs="0"/>
+      <xs:element name="TT_THAU" type="xs:string" minOccurs="0"/>
+      <xs:element name="PHAM_VI" type="xs:integer" minOccurs="0"/>
+      <xs:element name="TYLE_TT_BH" type="xs:integer" minOccurs="0"/>
+      <xs:element name="SO_LUONG" type="xs:decimal"/>
+      <xs:element name="DON_GIA" type="xs:decimal"/>
+      <xs:element name="THANH_TIEN_BV" type="xs:decimal"/>
+      <xs:element name="THANH_TIEN_BH" type="xs:decimal"/>
+      <xs:element name="T_NGUONKHAC_NSNN" type="xs:decimal" minOccurs="0"/>
+      <xs:element name="T_NGUONKHAC_VTNN" type="xs:decimal" minOccurs="0"/>
+      <xs:element name="T_NGUONKHAC_VTTN" type="xs:decimal" minOccurs="0"/>
+      <xs:element name="T_NGUONKHAC_CL" type="xs:decimal" minOccurs="0"/>
+      <xs:element name="T_NGUONKHAC" type="xs:decimal" minOccurs="0"/>
+      <xs:element name="MUC_HUONG" type="xs:integer"/>
+      <xs:element name="T_BHTT" type="xs:decimal"/>
+      <xs:element name="T_BNCCT" type="xs:decimal" minOccurs="0"/>
+      <xs:element name="T_BNTT" type="xs:decimal"/>
+      <xs:element name="MA_KHOA" type="xs:string" minOccurs="0"/>
+      <xs:element name="MA_BAC_SI" type="xs:string" minOccurs="0"/>
+      <xs:element name="MA_DICH_VU" type="xs:string" minOccurs="0"/>
+      <xs:element name="NGAY_YL" type="xs:string"/>
+      <xs:element name="NGAY_TH_YL" type="xs:string" minOccurs="0"/>
+      <xs:element name="MA_PTTT" type="xs:integer" minOccurs="0"/>
+      <xs:element name="NGUON_CTRA" type="xs:integer" minOccurs="0"/>
+      <xs:element name="VET_THUONG_TP" type="xs:integer" minOccurs="0"/>
+      <xs:element name="DU_PHONG" type="xs:string" minOccurs="0"/>
+    </xs:sequence>
+  </xs:complexType>
+
+</xs:schema>

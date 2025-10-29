@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema" elementFormDefault="qualified">
+  
+  <xs:element name="CHITIEU_CHITIET_PHUCHOI">
+    <xs:complexType>
+      <xs:sequence>
+        <xs:element name="DSACH_CHI_TIET_PHUC_HOI_CHUC_NANG">
+          <xs:complexType>
+            <xs:sequence>
+              <xs:element name="CHI_TIET_PHUC_HOI_CHUC_NANG" type="ChiTietPhucHoiType" maxOccurs="unbounded"/>
+            </xs:sequence>
+          </xs:complexType>
+        </xs:element>
+      </xs:sequence>
+    </xs:complexType>
+  </xs:element>
+
+  <xs:complexType name="ChiTietPhucHoiType">
+    <xs:sequence>
+      <xs:element name="MA_LK" type="xs:string"/>
+      <xs:element name="STT" type="xs:integer"/>
+      <xs:element name="MA_DICH_VU" type="xs:string"/>
+      <xs:element name="TEN_DICH_VU" type="xs:string"/>
+      <xs:element name="LOAI_PHUC_HOI" type="xs:integer"/>
+      <xs:element name="DON_VI_TINH" type="xs:string"/>
+      <xs:element name="SO_LUONG" type="xs:decimal"/>
+      <xs:element name="DON_GIA" type="xs:decimal"/>
+      <xs:element name="THANH_TIEN" type="xs:decimal"/>
+      <xs:element name="MA_BENH" type="xs:string" minOccurs="0"/>
+      <xs:element name="TINH_TRANG_TRUOC" type="xs:string" minOccurs="0"/>
+      <xs:element name="TINH_TRANG_SAU" type="xs:string" minOccurs="0"/>
+      <xs:element name="NGAY_THUC_HIEN" type="xs:string"/>
+      <xs:element name="SO_BUOI_DIEU_TRI" type="xs:integer" minOccurs="0"/>
+      <xs:element name="MA_BAC_SI" type="xs:string" minOccurs="0"/>
+      <xs:element name="NGUOI_THUC_HIEN" type="xs:string" minOccurs="0"/>
+      <xs:element name="KET_QUA_PHUC_HOI" type="xs:string" minOccurs="0"/>
+      <xs:element name="DU_PHONG" type="xs:string" minOccurs="0"/>
+    </xs:sequence>
+  </xs:complexType>
+
+</xs:schema>

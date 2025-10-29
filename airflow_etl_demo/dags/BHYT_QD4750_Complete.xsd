@@ -1,97 +1,101 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema" 
+           targetNamespace="http://www.moh.gov.vn/bhyt/qd4750"
+           xmlns:bhyt="http://www.moh.gov.vn/bhyt/qd4750"
            elementFormDefault="qualified"
-           attributeFormDefault="unqualified">
+           attributeFormDefault="unqualified"
+           version="2.0">
 
   <xs:annotation>
     <xs:documentation>
-      XSD for actual BHYT XML structure (QĐ 4750) - Based on real data
-      Hỗ trợ plain text XML trong NOIDUNGFILE (không base64)
+      XML Schema Definition cho Quyết định 4750/QĐ-BYT
+      Chuẩn và định dạng dữ liệu đầu ra phục vụ quản lý, giám định, 
+      thanh toán chi phí KCB BHYT
+      Phiên bản: 2.0 (sửa đổi QĐ 130/QĐ-BYT)
+      Ngày ban hành: 29/12/2023
+      Áp dụng từ: 01/07/2024
     </xs:documentation>
   </xs:annotation>
 
   <!-- ========================================== -->
-  <!-- ROOT ELEMENT -->
+  <!-- SIMPLE TYPES - Định nghĩa kiểu dữ liệu cơ bản -->
   <!-- ========================================== -->
   
-  <xs:element name="GIAMDINHHS">
-    <xs:complexType>
-      <xs:sequence>
-        <xs:element name="THONGTINDONVI" type="ThongTinDonViType" minOccurs="0"/>
-        <xs:element name="THONGTINHOSO" type="ThongTinHoSoType"/>
-        <xs:element name="CHUKYDONVI" type="xs:string" minOccurs="0"/>
-      </xs:sequence>
-      <xs:attribute name="xsd" type="xs:anyURI"/>
-      <xs:attribute name="xsi" type="xs:anyURI"/>
-    </xs:complexType>
-  </xs:element>
-
-  <!-- ========================================== -->
-  <!-- THÔNG TIN ĐƠN VỊ -->
-  <!-- ========================================== -->
+  <xs:simpleType name="DateTimeType">
+    <xs:annotation>
+      <xs:documentation>Định dạng ngày giờ: YYYYMMDDHHMMSS (14 ký tự)</xs:documentation>
+    </xs:annotation>
+    <xs:restriction base="xs:string">
+      <xs:pattern value="\d{14}"/>
+    </xs:restriction>
+  </xs:simpleType>
   
-  <xs:complexType name="ThongTinDonViType">
-    <xs:sequence>
-      <xs:element name="MACSKCB" type="xs:string"/>
-    </xs:sequence>
-  </xs:complexType>
-
-  <!-- ========================================== -->
-  <!-- THÔNG TIN HỒ SƠ -->
-  <!-- ========================================== -->
+  <xs:simpleType name="DateType">
+    <xs:annotation>
+      <xs:documentation>Định dạng ngày: YYYYMMDD (8 ký tự)</xs:documentation>
+    </xs:annotation>
+    <xs:restriction base="xs:string">
+      <xs:pattern value="\d{8}"/>
+    </xs:restriction>
+  </xs:simpleType>
   
-  <xs:complexType name="ThongTinHoSoType">
-    <xs:sequence>
-      <xs:element name="NGAYLAP" type="xs:string"/>
-      <xs:element name="SOLUONGHOSO" type="xs:int"/>
-      <xs:element name="DANHSACHHOSO">
-        <xs:complexType>
-          <xs:sequence>
-            <xs:element name="HOSO" maxOccurs="unbounded">
-              <xs:complexType>
-                <xs:sequence>
-                  <xs:element name="FILEHOSO" type="FileHoSoType" maxOccurs="unbounded"/>
-                </xs:sequence>
-              </xs:complexType>
-            </xs:element>
-          </xs:sequence>
-        </xs:complexType>
-      </xs:element>
-    </xs:sequence>
-  </xs:complexType>
-
-  <xs:complexType name="FileHoSoType">
-    <xs:sequence>
-      <xs:element name="LOAIHOSO">
-        <xs:simpleType>
-          <xs:restriction base="xs:string">
-            <xs:enumeration value="XML1"/>
-            <xs:enumeration value="XML2"/>
-            <xs:enumeration value="XML3"/>
-            <xs:enumeration value="XML4"/>
-            <xs:enumeration value="XML5"/>
-            <xs:enumeration value="XML6"/>
-            <xs:enumeration value="XML7"/>
-            <xs:enumeration value="XML8"/>
-            <xs:enumeration value="XML9"/>
-            <xs:enumeration value="XML10"/>
-            <xs:enumeration value="XML11"/>
-            <xs:enumeration value="XML12"/>
-            <xs:enumeration value="XML13"/>
-            <xs:enumeration value="XML14"/>
-            <xs:enumeration value="XML15"/>
-          </xs:restriction>
-        </xs:simpleType>
-      </xs:element>
-      <xs:element name="NOIDUNGFILE" type="xs:string">
-        <xs:annotation>
-          <xs:documentation>Plain text XML content (không mã hóa base64)</xs:documentation>
-        </xs:annotation>
-      </xs:element>
-    </xs:sequence>
-  </xs:complexType>
-
+  <xs:simpleType name="MaTheType">
+    <xs:annotation>
+      <xs:documentation>Mã thẻ BHYT: 15 ký tự</xs:documentation>
+    </xs:annotation>
+    <xs:restriction base="xs:string">
+      <xs:length value="15"/>
+    </xs:restriction>
+  </xs:simpleType>
   
+  <xs:simpleType name="GioiTinhType">
+    <xs:annotation>
+      <xs:documentation>Giới tính: 1=Nam, 2=Nữ, 3=Không xác định</xs:documentation>
+    </xs:annotation>
+    <xs:restriction base="xs:int">
+      <xs:enumeration value="1"/>
+      <xs:enumeration value="2"/>
+      <xs:enumeration value="3"/>
+    </xs:restriction>
+  </xs:simpleType>
+  
+  <xs:simpleType name="KetQuaDTRIType">
+    <xs:annotation>
+      <xs:documentation>Kết quả điều trị: 1=Khỏi, 2=Đỡ, 3=Không thay đổi, 4=Nặng hơn, 5=Tử vong</xs:documentation>
+    </xs:annotation>
+    <xs:restriction base="xs:int">
+      <xs:enumeration value="1"/>
+      <xs:enumeration value="2"/>
+      <xs:enumeration value="3"/>
+      <xs:enumeration value="4"/>
+      <xs:enumeration value="5"/>
+    </xs:restriction>
+  </xs:simpleType>
+  
+  <xs:simpleType name="TinhTrangRVType">
+    <xs:annotation>
+      <xs:documentation>Tình trạng ra viện: 1=Ra viện, 2=Chuyển viện, 3=Trốn viện, 4=Xin về</xs:documentation>
+    </xs:annotation>
+    <xs:restriction base="xs:int">
+      <xs:enumeration value="1"/>
+      <xs:enumeration value="2"/>
+      <xs:enumeration value="3"/>
+      <xs:enumeration value="4"/>
+    </xs:restriction>
+  </xs:simpleType>
+  
+  <xs:simpleType name="LoaiKCBType">
+    <xs:annotation>
+      <xs:documentation>Loại KCB: 1=Ngoại trú, 2=Nội trú, 3=Ngoại trú cấp cứu, 4=Nội trú ban ngày</xs:documentation>
+    </xs:annotation>
+    <xs:restriction base="xs:int">
+      <xs:enumeration value="1"/>
+      <xs:enumeration value="2"/>
+      <xs:enumeration value="3"/>
+      <xs:enumeration value="4"/>
+    </xs:restriction>
+  </xs:simpleType>
+
   <!-- ========================================== -->
   <!-- ROOT ELEMENT - File wrapper chính -->
   <!-- ========================================== -->
