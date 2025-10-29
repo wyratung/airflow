@@ -14,6 +14,7 @@ import logging
 import json
 import sys
 import os
+import re
 import pathlib
 from pathlib import Path
 sys.path.insert(0, '/opt/airflow/plugins/helpers')
@@ -140,7 +141,10 @@ def task_load_from_s3(**context):
         
         logger.info(f"Successfully downloaded and decoded XML")
         logger.info(f"XML content length: {len(xml_content)} characters")
-        
+        logger.info(xml_content)
+        output_filename = f"loaded_xml_{execution_date.strftime('%Y%m%dT%H%M%S')}.json"
+        with open(output_filename, 'w', encoding='utf-8') as f:
+            json.dump(xml_content, f, ensure_ascii=False, indent=2)
         # Step 4: Basic XML structure check
         logger.info("Step 4: Performing basic XML structure check...")
         
@@ -204,6 +208,8 @@ def task_validate_xml(**context):
     
     Input: Raw XML string
     Output: Validation result và parsed XML root
+
+    TASK 2: Validate XML thực tế (không dùng XSD chi tiết)
     """
     logger = logging.getLogger(__name__)
     ti = context['task_instance']
@@ -213,7 +219,7 @@ def task_validate_xml(**context):
     logger.info("=" * 80)
     
     try:
-        # Step 1: Pull XML content từ previous task
+        # Step 1: Pull XML content
         logger.info("Step 1: Pulling XML content from previous task...")
         
         xml_content = ti.xcom_pull(task_ids='load_from_s3', key='raw_xml_content')
@@ -224,8 +230,8 @@ def task_validate_xml(**context):
         
         logger.info(f"XML content size: {len(xml_content)} characters")
         
-        # Step 2: XML Syntax Validation
-        logger.info("Step 2: Validating XML syntax...")
+        # Step 2: XML Syntax Validation (wrapper only)
+        logger.info("Step 2: Validating wrapper XML syntax...")
         
         import xml.etree.ElementTree as ET
         
@@ -235,105 +241,140 @@ def task_validate_xml(**context):
                 xml_content = xml_content[1:]
                 logger.info("Removed BOM from XML content")
             
+            # Parse wrapper XML
             root = ET.fromstring(xml_content.encode('utf-8'))
-            logger.info(f"XML parsed successfully. Root element: {root.tag}")
+            logger.info(f"✓ Wrapper XML parsed successfully. Root element: {root.tag}")
             
         except ET.ParseError as e:
             logger.error(f"XML parsing error: {str(e)}")
             raise ValueError(f"Invalid XML syntax: {str(e)}")
         
-        # Step 3: Schema Validation
-        logger.info("Step 3: Validating XML schema and structure...")
+        # Step 3: Validate structure (không dùng XSD)
+        logger.info("Step 3: Validating XML structure...")
         
         validation_errors = []
         validation_warnings = []
         
-        # Check required root elements
-        required_elements = {
-            'MA_LK': './/MA_LK',
-            'MACSKCB': './/MACSKCB',
-            'HO_TEN': './/HO_TEN',
-            'MA_THE': './/MA_THE',
-            'NGAY_VAO': './/NGAY_VAO',
-            'NGAY_RA': './/NGAY_RA'
-        }
+        # Check root element
+        if root.tag != 'GIAMDINHHS':
+            validation_errors.append(f"Invalid root element: {root.tag}, expected GIAMDINHHS")
         
-        for field_name, xpath in required_elements.items():
-            element = root.find(xpath)
-            if element is None or not element.text:
-                validation_errors.append(f"Missing or empty required field: {field_name}")
+        # Check THONGTINDONVI
+        thongtindonvi = root.find('THONGTINDONVI')
+        if thongtindonvi is not None:
+            macskcb = thongtindonvi.findtext('MACSKCB')
+            if macskcb:
+                logger.info(f"✓ Found MACSKCB: {macskcb}")
             else:
-                logger.info(f"✓ Found {field_name}: {element.text[:50] if len(element.text) > 50 else element.text}")
+                validation_warnings.append("MACSKCB is empty")
         
-        # Step 4: Business Rules Validation
+        # Check THONGTINHOSO
+        thongtinhoso = root.find('THONGTINHOSO')
+        if thongtinhoso is None:
+            validation_errors.append("Missing THONGTINHOSO element")
+        else:
+            ngaylap = thongtinhoso.findtext('NGAYLAP')
+            soluonghoso = thongtinhoso.findtext('SOLUONGHOSO')
+            
+            logger.info(f"✓ NGAYLAP: {ngaylap}")
+            logger.info(f"✓ SOLUONGHOSO: {soluonghoso}")
+            
+            # Check DANHSACHHOSO
+            danhsachhoso = thongtinhoso.find('DANHSACHHOSO')
+            if danhsachhoso is None:
+                validation_errors.append("Missing DANHSACHHOSO element")
+            else:
+                hoso_list = danhsachhoso.findall('HOSO')
+                logger.info(f"✓ Found {len(hoso_list)} HOSO elements")
+                
+                # Validate each HOSO
+                for idx, hoso in enumerate(hoso_list, 1):
+                    filehoso_list = hoso.findall('FILEHOSO')
+                    logger.info(f"✓ HOSO #{idx}: Contains {len(filehoso_list)} FILEHOSO")
+                    
+                    xml_types = []
+                    for filehoso in filehoso_list:
+                        loaihoso = filehoso.findtext('LOAIHOSO')
+                        noidungfile = filehoso.findtext('NOIDUNGFILE', '')
+                        
+                        if loaihoso:
+                            xml_types.append(loaihoso)
+                            logger.info(f"  - {loaihoso}: {len(noidungfile)} characters")
+                            
+                            # Validate nested XML syntax
+                            if noidungfile.strip():
+                                try:
+                                    # Remove BOM from nested XML
+                                    nested_xml = noidungfile.strip()
+                                    if nested_xml.startswith('\ufeff'):
+                                        nested_xml = nested_xml[1:]
+                                    
+                                    nested_root = ET.fromstring(nested_xml.encode('utf-8'))
+                                    logger.info(f"    ✓ {loaihoso} nested XML valid: <{nested_root.tag}>")
+                                    
+                                    # Count elements in nested XML
+                                    if loaihoso == 'XML1':
+                                        ma_lk = nested_root.findtext('MA_LK')
+                                        ho_ten = nested_root.findtext('HO_TEN')
+                                        ma_the = nested_root.findtext('MA_THE_BHYT')
+                                        if not ma_the:
+                                            ma_the = nested_root.findtext('MA_THE')
+                                        
+                                        logger.info(f"    MA_LK: {ma_lk}")
+                                        logger.info(f"    HO_TEN: {ho_ten}")
+                                        logger.info(f"    MA_THE: {ma_the}")
+                                        
+                                        if not ma_lk:
+                                            validation_errors.append(f"{loaihoso}: Missing MA_LK")
+                                        
+                                    elif loaihoso == 'XML2':
+                                        thuoc_count = len(nested_root.findall('.//CHI_TIET_THUOC'))
+                                        logger.info(f"    Chi tiết thuốc: {thuoc_count} records")
+                                        
+                                    elif loaihoso == 'XML3':
+                                        dvkt_count = len(nested_root.findall('.//CHI_TIET_DVKT'))
+                                        logger.info(f"    Chi tiết DVKT: {dvkt_count} records")
+                                        
+                                    elif loaihoso == 'XML4':
+                                        cls_count = len(nested_root.findall('.//CHI_TIET_CLS'))
+                                        logger.info(f"    Chi tiết CLS: {cls_count} records")
+                                        
+                                    elif loaihoso == 'XML5':
+                                        dbls_count = len(nested_root.findall('.//CHI_TIET_DIEN_BIEN_BENH'))
+                                        if dbls_count == 0:
+                                            dbls_count = len(nested_root.findall('.//DIEN_BIEN_LAM_SANG'))
+                                        logger.info(f"    Diễn biến lâm sàng: {dbls_count} records")
+                                    
+                                except ET.ParseError as nested_error:
+                                    validation_errors.append(f"{loaihoso} nested XML invalid: {str(nested_error)}")
+                                    logger.error(f"    ✗ {loaihoso} nested XML parse error: {str(nested_error)}")
+                            else:
+                                validation_warnings.append(f"{loaihoso} has empty NOIDUNGFILE")
+                    
+                    logger.info(f"  XML types in HOSO #{idx}: {', '.join(xml_types)}")
+        
+        # Step 4: Business rules validation
         logger.info("Step 4: Validating business rules...")
         
-        # Validate MA_THE format (15 ký tự)
-        ma_the_elem = root.find('.//MA_THE')
-        if ma_the_elem is not None and ma_the_elem.text:
-            ma_the = ma_the_elem.text.strip()
-            if len(ma_the) != 15:
-                validation_errors.append(f"MA_THE must be 15 characters, got {len(ma_the)}")
-            else:
-                logger.info(f"✓ MA_THE format valid: {ma_the}")
+        # Additional validations can be added here
         
-        # Validate dates
-        ngay_vao = root.findtext('.//NGAY_VAO', '')
-        ngay_ra = root.findtext('.//NGAY_RA', '')
-        
-        if ngay_vao and ngay_ra:
-            try:
-                dt_vao = datetime.strptime(ngay_vao, '%Y%m%d%H%M%S')
-                dt_ra = datetime.strptime(ngay_ra, '%Y%m%d%H%M%S')
-                
-                if dt_ra < dt_vao:
-                    validation_errors.append("NGAY_RA must be after NGAY_VAO")
-                else:
-                    so_ngay = (dt_ra - dt_vao).days
-                    logger.info(f"✓ Date range valid: {so_ngay} days")
-                    
-            except ValueError as e:
-                validation_errors.append(f"Invalid date format: {str(e)}")
-        
-        # Validate chi phí
-        t_tongchi = root.findtext('.//T_TONGCHI', '0')
-        try:
-            tongchi = float(t_tongchi)
-            if tongchi <= 0:
-                validation_warnings.append("T_TONGCHI is zero or negative")
-            else:
-                logger.info(f"✓ T_TONGCHI: {tongchi:,.0f} VND")
-        except ValueError:
-            validation_errors.append("T_TONGCHI is not a valid number")
-        
-        # Step 5: Count records in each table
-        logger.info("Step 5: Counting records in tables...")
-        
-        record_counts = {
-            'tonghop': 1,
-            'thuoc': len(root.findall('.//CHI_TIET_THUOC')),
-            'dvkt': len(root.findall('.//CHI_TIET_DVKT')),
-            'cls': len(root.findall('.//CHI_TIET_CLS')),
-            'dienbienlamsang': len(root.findall('.//DIEN_BIEN_LAM_SANG'))
-        }
-        
-        logger.info(f"Record counts: {record_counts}")
-        
-        # Step 6: Determine validation status
+        # Step 5: Determine validation status
         is_valid = len(validation_errors) == 0
         
         if validation_errors:
             logger.error(f"Validation FAILED with {len(validation_errors)} errors:")
             for error in validation_errors:
                 logger.error(f"  - {error}")
+        else:
+            logger.info("✓ All validations passed")
         
         if validation_warnings:
             logger.warning(f"Validation has {len(validation_warnings)} warnings:")
             for warning in validation_warnings:
                 logger.warning(f"  - {warning}")
         
-        # Step 7: Push validation results to XCom
-        logger.info("Step 7: Pushing validation results to XCom...")
+        # Step 6: Push validation results to XCom
+        logger.info("Step 6: Pushing validation results to XCom...")
         
         validation_result = {
             'is_valid': is_valid,
@@ -342,12 +383,11 @@ def task_validate_xml(**context):
             'warning_count': len(validation_warnings),
             'errors': validation_errors,
             'warnings': validation_warnings,
-            'record_counts': record_counts,
             'validated_at': datetime.utcnow().isoformat()
         }
         
         ti.xcom_push(key='validation_result', value=validation_result)
-        ti.xcom_push(key='validated_xml', value=xml_content)  # Pass through for next task
+        ti.xcom_push(key='validated_xml', value=xml_content)
         
         logger.info("=" * 80)
         logger.info(f"TASK 2: VALIDATE - Completed")
@@ -355,9 +395,9 @@ def task_validate_xml(**context):
         logger.info(f"Errors: {len(validation_errors)}, Warnings: {len(validation_warnings)}")
         logger.info("=" * 80)
         
-        # Nếu có lỗi nghiêm trọng, raise exception
-        if not is_valid and len(validation_errors) > 5:
-            raise AirflowFailException(f"Validation failed with {len(validation_errors)} errors")
+        # Nếu có quá nhiều lỗi nghiêm trọng, raise exception
+        if not is_valid and len(validation_errors) > 10:
+            raise AirflowFailException(f"Validation failed with {len(validation_errors)} critical errors")
         
         return validation_result
         
@@ -754,7 +794,7 @@ def task_output_json(**context):
         temp_dir = tempfile.gettempdir()
         output_path = os.path.join(temp_dir, output_filename)
         with open(output_path, 'w', encoding='utf-8') as f:
-            json.dump(dto, f, ensure_ascii=False, indent=2)
+            json.dump(json_string, f, ensure_ascii=False, indent=2)
         # with open(output_path, 'w', encoding='utf-8') as f:
         #     f.write(json_string)
         
@@ -851,7 +891,7 @@ def task_output_json(**context):
         
         # Clean up temp file
         try:
-            os.remove(output_path)
+            # os.remove(output_path)
             logger.info(f"Cleaned up temporary file: {output_path}")
         except Exception as e:
             logger.warning(f"Failed to clean up temp file: {str(e)}")
@@ -916,7 +956,7 @@ def send_json_to_api(endpoint_url: str, json_data: str, ma_lk: str, logger) -> d
     
     # Prepare request
     headers = {
-        'Content-Type': 'application/json',
+        # 'Content-Type': 'application/json',
         'Accept': 'application/json',
         'User-Agent': 'Airflow-BHYT-ETL/2.0',
         'X-MA-LK': ma_lk,

@@ -79,34 +79,52 @@ class S3FileLoader:
         """
         Detect file type và decode phù hợp
         Thứ tự kiểm tra:
-        1. Base64-encoded XML
-        2. Gzip compressed
-        3. ZIP file
-        4. Plain XML
+        1. XML with base64-encoded content in <NOIDUNGFILE>
+        2. Base64-encoded XML
+        3. Gzip compressed
+        4. ZIP file
+        5. Plain XML
         """
+        # Try to decode as UTF-8 first to check for XML wrapper
+        try:
+            xml_string = file_content.decode('utf-8')
+            if '<NOIDUNGFILE>' in xml_string:
+                self.logger.info("Detected XML with base64-encoded contents")
+                # Extract and decode all <NOIDUNGFILE> contents while preserving structure
+                import re
+                
+                def decode_base64_content(match):
+                    encoded_content = match.group(1).strip()
+                    try:
+                        decoded_content = self._decode_base64(encoded_content.encode('utf-8'))
+                        # Remove XML declaration from nested XML content
+                        decoded_content = decoded_content.replace('<?xml version="1.0" encoding="utf-8"?>', '').strip()
+                        return f"<NOIDUNGFILE>{decoded_content}</NOIDUNGFILE>"
+                    except Exception as e:
+                        self.logger.warning(f"Failed to decode content: {str(e)}")
+                        return match.group(0)  # Return original if decode fails
+                
+                # Replace all <NOIDUNGFILE> contents with decoded versions
+                decoded_xml = re.sub(
+                    r'<NOIDUNGFILE>(.*?)</NOIDUNGFILE>', 
+                    decode_base64_content, 
+                    xml_string, 
+                    flags=re.DOTALL
+                )
+                return decoded_xml
+                
+            elif xml_string.strip().startswith('<?xml') or xml_string.strip().startswith('<'):
+                self.logger.info("Detected plain XML content")
+                return xml_string
+        except UnicodeDecodeError:
+            pass
+        
         # Kiểm tra nếu là base64-encoded
         if self._is_base64_encoded(file_content):
             self.logger.info("Detected base64-encoded content")
             return self._decode_base64(file_content)
         
-        # Kiểm tra nếu là gzip
-        if file_content[:2] == b'\x1f\x8b':
-            self.logger.info("Detected gzip-compressed content")
-            return self._decompress_gzip(file_content)
         
-        # Kiểm tra nếu là ZIP file
-        if file_content[:4] == b'PK\x03\x04' or filename.endswith('.zip'):
-            self.logger.info("Detected ZIP file")
-            return self._extract_from_zip(file_content)
-        
-        # Plain XML
-        try:
-            xml_string = file_content.decode('utf-8')
-            if xml_string.strip().startswith('<?xml') or xml_string.strip().startswith('<'):
-                self.logger.info("Detected plain XML content")
-                return xml_string
-        except UnicodeDecodeError:
-            pass
         
         # Nếu không detect được, thử decode base64 (fallback)
         self.logger.warning("Unable to detect format, trying base64 decode")

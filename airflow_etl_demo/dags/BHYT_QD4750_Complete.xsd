@@ -1,0 +1,850 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema" 
+           elementFormDefault="qualified"
+           attributeFormDefault="unqualified">
+
+  <xs:annotation>
+    <xs:documentation>
+      XSD for actual BHYT XML structure (QĐ 4750) - Based on real data
+      Hỗ trợ plain text XML trong NOIDUNGFILE (không base64)
+    </xs:documentation>
+  </xs:annotation>
+
+  <!-- ========================================== -->
+  <!-- ROOT ELEMENT -->
+  <!-- ========================================== -->
+  
+  <xs:element name="GIAMDINHHS">
+    <xs:complexType>
+      <xs:sequence>
+        <xs:element name="THONGTINDONVI" type="ThongTinDonViType" minOccurs="0"/>
+        <xs:element name="THONGTINHOSO" type="ThongTinHoSoType"/>
+        <xs:element name="CHUKYDONVI" type="xs:string" minOccurs="0"/>
+      </xs:sequence>
+      <xs:attribute name="xsd" type="xs:anyURI"/>
+      <xs:attribute name="xsi" type="xs:anyURI"/>
+    </xs:complexType>
+  </xs:element>
+
+  <!-- ========================================== -->
+  <!-- THÔNG TIN ĐƠN VỊ -->
+  <!-- ========================================== -->
+  
+  <xs:complexType name="ThongTinDonViType">
+    <xs:sequence>
+      <xs:element name="MACSKCB" type="xs:string"/>
+    </xs:sequence>
+  </xs:complexType>
+
+  <!-- ========================================== -->
+  <!-- THÔNG TIN HỒ SƠ -->
+  <!-- ========================================== -->
+  
+  <xs:complexType name="ThongTinHoSoType">
+    <xs:sequence>
+      <xs:element name="NGAYLAP" type="xs:string"/>
+      <xs:element name="SOLUONGHOSO" type="xs:int"/>
+      <xs:element name="DANHSACHHOSO">
+        <xs:complexType>
+          <xs:sequence>
+            <xs:element name="HOSO" maxOccurs="unbounded">
+              <xs:complexType>
+                <xs:sequence>
+                  <xs:element name="FILEHOSO" type="FileHoSoType" maxOccurs="unbounded"/>
+                </xs:sequence>
+              </xs:complexType>
+            </xs:element>
+          </xs:sequence>
+        </xs:complexType>
+      </xs:element>
+    </xs:sequence>
+  </xs:complexType>
+
+  <xs:complexType name="FileHoSoType">
+    <xs:sequence>
+      <xs:element name="LOAIHOSO">
+        <xs:simpleType>
+          <xs:restriction base="xs:string">
+            <xs:enumeration value="XML1"/>
+            <xs:enumeration value="XML2"/>
+            <xs:enumeration value="XML3"/>
+            <xs:enumeration value="XML4"/>
+            <xs:enumeration value="XML5"/>
+            <xs:enumeration value="XML6"/>
+            <xs:enumeration value="XML7"/>
+            <xs:enumeration value="XML8"/>
+            <xs:enumeration value="XML9"/>
+            <xs:enumeration value="XML10"/>
+            <xs:enumeration value="XML11"/>
+            <xs:enumeration value="XML12"/>
+            <xs:enumeration value="XML13"/>
+            <xs:enumeration value="XML14"/>
+            <xs:enumeration value="XML15"/>
+          </xs:restriction>
+        </xs:simpleType>
+      </xs:element>
+      <xs:element name="NOIDUNGFILE" type="xs:string">
+        <xs:annotation>
+          <xs:documentation>Plain text XML content (không mã hóa base64)</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+    </xs:sequence>
+  </xs:complexType>
+
+  
+  <!-- ========================================== -->
+  <!-- ROOT ELEMENT - File wrapper chính -->
+  <!-- ========================================== -->
+  
+  <xs:element name="GIAMDINHHS">
+    <xs:annotation>
+      <xs:documentation>Element gốc - File XML wrapper chứa tất cả các hồ sơ</xs:documentation>
+    </xs:annotation>
+    <xs:complexType>
+      <xs:sequence>
+        <xs:element name="THONGTINHOSO" type="bhyt:ThongTinHoSoType"/>
+        <xs:element name="CHUKYDONVI" type="xs:string" minOccurs="0">
+          <xs:annotation>
+            <xs:documentation>Chữ ký số của đơn vị (Base64 encoded)</xs:documentation>
+          </xs:annotation>
+        </xs:element>
+      </xs:sequence>
+    </xs:complexType>
+  </xs:element>
+
+  <!-- ========================================== -->
+  <!-- THÔNG TIN HỒ SƠ -->
+  <!-- ========================================== -->
+  
+  <xs:complexType name="ThongTinHoSoType">
+    <xs:sequence>
+      <xs:element name="NGAYLAP" type="bhyt:DateType">
+        <xs:annotation>
+          <xs:documentation>Ngày lập hồ sơ (YYYYMMDD)</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="SOLUONGHOSO" type="xs:int">
+        <xs:annotation>
+          <xs:documentation>Số lượng hồ sơ trong file</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="DANHSACHHOSO">
+        <xs:complexType>
+          <xs:sequence>
+            <xs:element name="HOSO" type="bhyt:HoSoType" maxOccurs="unbounded"/>
+          </xs:sequence>
+        </xs:complexType>
+      </xs:element>
+    </xs:sequence>
+  </xs:complexType>
+  
+  <xs:complexType name="HoSoType">
+    <xs:sequence>
+      <xs:element name="FILEHOSO" type="bhyt:FileHoSoType" maxOccurs="unbounded"/>
+    </xs:sequence>
+  </xs:complexType>
+  
+  <xs:complexType name="FileHoSoType">
+    <xs:sequence>
+      <xs:element name="LOAIHOSO">
+        <xs:annotation>
+          <xs:documentation>Loại hồ sơ: CHECKIN, XML1, XML2, ..., XML15</xs:documentation>
+        </xs:annotation>
+        <xs:simpleType>
+          <xs:restriction base="xs:string">
+            <xs:enumeration value="CHECKIN"/>
+            <xs:enumeration value="XML1"/>
+            <xs:enumeration value="XML2"/>
+            <xs:enumeration value="XML3"/>
+            <xs:enumeration value="XML4"/>
+            <xs:enumeration value="XML5"/>
+            <xs:enumeration value="XML6"/>
+            <xs:enumeration value="XML7"/>
+            <xs:enumeration value="XML8"/>
+            <xs:enumeration value="XML9"/>
+            <xs:enumeration value="XML10"/>
+            <xs:enumeration value="XML11"/>
+            <xs:enumeration value="XML12"/>
+            <xs:enumeration value="XML13"/>
+            <xs:enumeration value="XML14"/>
+            <xs:enumeration value="XML15"/>
+          </xs:restriction>
+        </xs:simpleType>
+      </xs:element>
+      <xs:element name="NOIDUNGFILE" type="xs:base64Binary">
+        <xs:annotation>
+          <xs:documentation>Nội dung file XML được mã hóa Base64</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+    </xs:sequence>
+  </xs:complexType>
+
+  <!-- ========================================== -->
+  <!-- BẢNG CHECK-IN - Thông tin trạng thái KCB -->
+  <!-- ========================================== -->
+  
+  <xs:element name="BANG_CHECK_IN">
+    <xs:complexType>
+      <xs:sequence>
+        <xs:element name="MA_LK" type="xs:string"/>
+        <xs:element name="MA_CSKCB" type="xs:string"/>
+        <xs:element name="NGAY_VAO" type="bhyt:DateTimeType"/>
+        <xs:element name="NGAY_RA" type="bhyt:DateTimeType" minOccurs="0"/>
+        <xs:element name="TRANG_THAI" type="xs:int">
+          <xs:annotation>
+            <xs:documentation>1=Đang điều trị, 2=Đã ra viện</xs:documentation>
+          </xs:annotation>
+        </xs:element>
+        <xs:element name="MA_THE" type="bhyt:MaTheType"/>
+        <xs:element name="MA_BENH_CHINH" type="xs:string" minOccurs="0"/>
+        <xs:element name="MA_BENH_KEM" type="xs:string" minOccurs="0"/>
+      </xs:sequence>
+    </xs:complexType>
+  </xs:element>
+
+  <!-- ========================================== -->
+  <!-- XML1 - BẢNG TỔNG HỢP KCB -->
+  <!-- ========================================== -->
+  
+  <xs:element name="TONG_HOP">
+    <xs:complexType>
+      <xs:sequence>
+        <!-- Mã liên kết -->
+        <xs:element name="MA_LK" type="xs:string">
+          <xs:annotation>
+            <xs:documentation>Mã liên kết (PRIMARY KEY) - Duy nhất cho mỗi đợt KCB</xs:documentation>
+          </xs:annotation>
+        </xs:element>
+        <xs:element name="STT" type="xs:int"/>
+        
+        <!-- Thông tin hành chính -->
+        <xs:element name="MA_BN" type="xs:string"/>
+        <xs:element name="HO_TEN" type="xs:string"/>
+        <xs:element name="SO_CCCD" type="xs:string" minOccurs="0"/>
+        <xs:element name="NGAY_SINH" type="xs:string"/>
+        <xs:element name="GIOI_TINH" type="bhyt:GioiTinhType"/>
+        <xs:element name="NHOM_MAU" type="xs:string" minOccurs="0"/>
+        <xs:element name="MA_QUOCTICH" type="xs:string" minOccurs="0"/>
+        <xs:element name="MA_DANTOC" type="xs:string" minOccurs="0"/>
+        <xs:element name="MA_NGHE_NGHIEP" type="xs:string" minOccurs="0"/>
+        <xs:element name="DIA_CHI" type="xs:string"/>
+        <xs:element name="MA_TINH" type="xs:string" minOccurs="0"/>
+        <xs:element name="MA_HUYEN" type="xs:string" minOccurs="0"/>
+        <xs:element name="MA_XA" type="xs:string" minOccurs="0"/>
+        
+        <!-- Thông tin thẻ BHYT -->
+        <xs:element name="MA_THE" type="bhyt:MaTheType"/>
+        <xs:element name="MA_DKBD" type="xs:string"/>
+        <xs:element name="GT_THE_TU" type="bhyt:DateTimeType"/>
+        <xs:element name="GT_THE_DEN" type="bhyt:DateTimeType"/>
+        <xs:element name="MIEN_CUNG_CT" type="xs:int" minOccurs="0"/>
+        <xs:element name="MA_KV" type="xs:string" minOccurs="0"/>
+        
+        <!-- Thông tin chẩn đoán -->
+        <xs:element name="MA_BENH" type="xs:string">
+          <xs:annotation>
+            <xs:documentation>Mã bệnh chính (ICD-10)</xs:documentation>
+          </xs:annotation>
+        </xs:element>
+        <xs:element name="MA_BENHKHAC" type="xs:string" minOccurs="0"/>
+        <xs:element name="MA_BENH_YHCT" type="xs:string" minOccurs="0"/>
+        <xs:element name="TEN_BENH" type="xs:string" minOccurs="0"/>
+        
+        <!-- Thông tin KCB -->
+        <xs:element name="MA_LYDO_VVIEN" type="xs:string" minOccurs="0"/>
+        <xs:element name="MA_NOI_CHUYEN" type="xs:string" minOccurs="0"/>
+        <xs:element name="MA_TAI_NAN" type="xs:string" minOccurs="0"/>
+        <xs:element name="NGAY_VAO" type="bhyt:DateTimeType"/>
+        <xs:element name="NGAY_VAO_NOI_TRU" type="bhyt:DateTimeType" minOccurs="0"/>
+        <xs:element name="NGAY_RA" type="bhyt:DateTimeType"/>
+        <xs:element name="SO_NGAY_DTRI" type="xs:int"/>
+        <xs:element name="KET_QUA_DTRI" type="bhyt:KetQuaDTRIType"/>
+        <xs:element name="TINH_TRANG_RV" type="bhyt:TinhTrangRVType"/>
+        <xs:element name="NGAY_TTOAN" type="bhyt:DateTimeType"/>
+        <xs:element name="PP_DIEUTRI" type="xs:string" minOccurs="0"/>
+        
+        <!-- Chi phí tổng hợp -->
+        <xs:element name="T_TONGCHI" type="xs:decimal"/>
+        <xs:element name="T_TONGCHI_BV" type="xs:decimal" minOccurs="0"/>
+        <xs:element name="T_TONGCHI_BH" type="xs:decimal" minOccurs="0"/>
+        <xs:element name="T_BHTT" type="xs:decimal"/>
+        <xs:element name="T_BNCCT" type="xs:decimal"/>
+        <xs:element name="T_BNTT" type="xs:decimal"/>
+        <xs:element name="T_NGUONKHAC" type="xs:decimal" minOccurs="0"/>
+        <xs:element name="T_NGOAIDM" type="xs:decimal" minOccurs="0"/>
+        
+        <!-- Chi phí chi tiết -->
+        <xs:element name="T_KHAM" type="xs:decimal" minOccurs="0"/>
+        <xs:element name="T_XETNGHIEM" type="xs:decimal" minOccurs="0"/>
+        <xs:element name="T_CDHA" type="xs:decimal" minOccurs="0"/>
+        <xs:element name="T_THUOC" type="xs:decimal" minOccurs="0"/>
+        <xs:element name="T_MAU" type="xs:decimal" minOccurs="0"/>
+        <xs:element name="T_PTTT" type="xs:decimal" minOccurs="0"/>
+        <xs:element name="T_VTYT" type="xs:decimal" minOccurs="0"/>
+        <xs:element name="T_DVKT_TYLE" type="xs:decimal" minOccurs="0"/>
+        <xs:element name="T_THUOC_TYLE" type="xs:decimal" minOccurs="0"/>
+        <xs:element name="T_KHAM_TYLE" type="xs:decimal" minOccurs="0"/>
+        <xs:element name="T_GIUONG" type="xs:decimal" minOccurs="0"/>
+        <xs:element name="T_VCHUYEN" type="xs:decimal" minOccurs="0"/>
+        <xs:element name="T_BNTT_VTYT" type="xs:decimal" minOccurs="0"/>
+        
+        <!-- Thông tin cơ sở KCB -->
+        <xs:element name="MA_LOAI_KCB" type="bhyt:LoaiKCBType"/>
+        <xs:element name="MA_KHOA" type="xs:string"/>
+        <xs:element name="MA_CSKCB" type="xs:string"/>
+        <xs:element name="MA_KHUVUC" type="xs:string" minOccurs="0"/>
+        <xs:element name="MA_PTTT_QT" type="xs:string" minOccurs="0"/>
+        
+        <!-- Thông tin bác sĩ -->
+        <xs:element name="MA_BACSI_DIEUTRI" type="xs:string" minOccurs="0"/>
+        <xs:element name="TEN_BACSI_DIEUTRI" type="xs:string" minOccurs="0"/>
+        <xs:element name="MA_BACSI_KETLUAN" type="xs:string" minOccurs="0"/>
+        <xs:element name="TEN_BACSI_KETLUAN" type="xs:string" minOccurs="0"/>
+        
+        <!-- Thông tin khác -->
+        <xs:element name="MA_HSBA" type="xs:string" minOccurs="0"/>
+        <xs:element name="MA_TTDV" type="xs:string" minOccurs="0"/>
+        <xs:element name="MA_DOITUONG_KCB" type="xs:string" minOccurs="0"/>
+        <xs:element name="CAN_NANG" type="xs:decimal" minOccurs="0"/>
+        <xs:element name="NAM_QT" type="xs:int"/>
+        <xs:element name="THANG_QT" type="xs:int"/>
+        <xs:element name="MA_LOAI_RV" type="xs:string" minOccurs="0"/>
+        <xs:element name="MA_LOAI_RAVIEN" type="xs:string" minOccurs="0"/>
+        <xs:element name="SO_HDON" type="xs:string" minOccurs="0"/>
+        <xs:element name="DON_THUOC_HDON" type="xs:string" minOccurs="0"/>
+        <xs:element name="GIAY_CHUYEN_TUYEN" type="xs:string" minOccurs="0"/>
+        <xs:element name="GHI_CHU" type="xs:string" minOccurs="0"/>
+        <xs:element name="DU_PHONG" type="xs:string" minOccurs="0"/>
+      </xs:sequence>
+    </xs:complexType>
+  </xs:element>
+
+  <!-- ========================================== -->
+  <!-- XML2 - CHI TIẾT THUỐC -->
+  <!-- ========================================== -->
+  
+  <xs:element name="DSACH_CHI_TIET_THUOC">
+    <xs:complexType>
+      <xs:sequence>
+        <xs:element name="CHI_TIET_THUOC" maxOccurs="unbounded">
+          <xs:complexType>
+            <xs:sequence>
+              <xs:element name="MA_LK" type="xs:string"/>
+              <xs:element name="STT" type="xs:int"/>
+              <xs:element name="MA_THUOC" type="xs:string"/>
+              <xs:element name="MA_PP_CHEBIEN" type="xs:string" minOccurs="0"/>
+              <xs:element name="MA_CSKCB_THUOC" type="xs:string" minOccurs="0"/>
+              <xs:element name="MA_NHOM" type="xs:int">
+                <xs:annotation>
+                  <xs:documentation>Nhóm thuốc: 1-9</xs:documentation>
+                </xs:annotation>
+              </xs:element>
+              <xs:element name="TEN_THUOC" type="xs:string"/>
+              <xs:element name="DON_VI_TINH" type="xs:string"/>
+              <xs:element name="HAM_LUONG" type="xs:string" minOccurs="0"/>
+              <xs:element name="DUONG_DUNG" type="xs:string" minOccurs="0"/>
+              <xs:element name="DANG_BAO_CHE" type="xs:string" minOccurs="0"/>
+              <xs:element name="LIEU_DUNG" type="xs:string" minOccurs="0"/>
+              <xs:element name="CACH_DUNG" type="xs:string" minOccurs="0"/>
+              <xs:element name="SO_DANG_KY" type="xs:string" minOccurs="0"/>
+              <xs:element name="TT_THAU" type="xs:string" minOccurs="0"/>
+              <xs:element name="PHAM_VI" type="xs:int" minOccurs="0"/>
+              <xs:element name="TYLE_TT_DV" type="xs:decimal" minOccurs="0"/>
+              <xs:element name="SO_LUONG" type="xs:decimal"/>
+              <xs:element name="DON_GIA" type="xs:decimal"/>
+              <xs:element name="TYLE_TT_BH" type="xs:decimal" minOccurs="0"/>
+              <xs:element name="THANH_TIEN" type="xs:decimal"/>
+              <xs:element name="MUC_HUONG" type="xs:int"/>
+              <xs:element name="T_TRANTT" type="xs:decimal" minOccurs="0"/>
+              <xs:element name="T_BHTT" type="xs:decimal"/>
+              <xs:element name="T_BNCCT" type="xs:decimal"/>
+              <xs:element name="T_BNTT" type="xs:decimal"/>
+              <xs:element name="T_NGUONKHAC" type="xs:decimal" minOccurs="0"/>
+              <xs:element name="MA_KHOA" type="xs:string"/>
+              <xs:element name="MA_BAC_SI" type="xs:string" minOccurs="0"/>
+              <xs:element name="MA_DICH_VU" type="xs:string" minOccurs="0"/>
+              <xs:element name="MA_BENH" type="xs:string" minOccurs="0"/>
+              <xs:element name="NGAY_YL" type="bhyt:DateTimeType" minOccurs="0"/>
+              <xs:element name="NGAY_TH_YL" type="bhyt:DateTimeType" minOccurs="0"/>
+              <xs:element name="MA_PTTT" type="xs:string" minOccurs="0"/>
+              <xs:element name="NGUON_KHAC" type="xs:decimal" minOccurs="0"/>
+              <xs:element name="SO_NGAY" type="xs:int" minOccurs="0"/>
+              <xs:element name="SO_LUONG_KEDON" type="xs:decimal" minOccurs="0"/>
+              <xs:element name="LOAI_THUOC" type="xs:int" minOccurs="0"/>
+              <xs:element name="TEN_DIEU_TRI" type="xs:string" minOccurs="0"/>
+              <xs:element name="NGUOI_THUC_HIEN" type="xs:string" minOccurs="0"/>
+              <xs:element name="DU_PHONG" type="xs:string" minOccurs="0"/>
+            </xs:sequence>
+          </xs:complexType>
+        </xs:element>
+      </xs:sequence>
+    </xs:complexType>
+  </xs:element>
+
+  <!-- ========================================== -->
+  <!-- XML3 - CHI TIẾT DVKT VÀ VTYT -->
+  <!-- ========================================== -->
+  
+  <xs:element name="DSACH_CHI_TIET_DVKT">
+    <xs:complexType>
+      <xs:sequence>
+        <xs:element name="CHI_TIET_DVKT" maxOccurs="unbounded">
+          <xs:complexType>
+            <xs:sequence>
+              <xs:element name="MA_LK" type="xs:string"/>
+              <xs:element name="STT" type="xs:int"/>
+              <xs:element name="MA_DICH_VU" type="xs:string" minOccurs="0"/>
+              <xs:element name="MA_VAT_TU" type="xs:string" minOccurs="0"/>
+              <xs:element name="MA_NHOM" type="xs:int"/>
+              <xs:element name="GOI_VTYT" type="xs:string" minOccurs="0"/>
+              <xs:element name="TEN_VAT_TU" type="xs:string" minOccurs="0"/>
+              <xs:element name="TEN_DICH_VU" type="xs:string"/>
+              <xs:element name="MA_XANG_DAU" type="xs:string" minOccurs="0"/>
+              <xs:element name="DON_VI_TINH" type="xs:string"/>
+              <xs:element name="PHAM_VI" type="xs:int" minOccurs="0"/>
+              <xs:element name="SO_LUONG" type="xs:decimal"/>
+              <xs:element name="DON_GIA_BV" type="xs:decimal" minOccurs="0"/>
+              <xs:element name="DON_GIA_BH" type="xs:decimal" minOccurs="0"/>
+              <xs:element name="DON_GIA" type="xs:decimal"/>
+              <xs:element name="TYLE_TT_DV" type="xs:decimal" minOccurs="0"/>
+              <xs:element name="TYLE_TT_BH" type="xs:decimal" minOccurs="0"/>
+              <xs:element name="TT_THAU" type="xs:string" minOccurs="0"/>
+              <xs:element name="THANH_TIEN_BV" type="xs:decimal" minOccurs="0"/>
+              <xs:element name="THANH_TIEN_BH" type="xs:decimal" minOccurs="0"/>
+              <xs:element name="THANH_TIEN" type="xs:decimal"/>
+              <xs:element name="T_TRANTT" type="xs:decimal" minOccurs="0"/>
+              <xs:element name="MUC_HUONG" type="xs:int"/>
+              <xs:element name="T_BHTT" type="xs:decimal"/>
+              <xs:element name="T_BNCCT" type="xs:decimal"/>
+              <xs:element name="T_BNTT" type="xs:decimal"/>
+              <xs:element name="T_NGUONKHAC" type="xs:decimal" minOccurs="0"/>
+              <xs:element name="MA_KHOA" type="xs:string"/>
+              <xs:element name="MA_GIUONG" type="xs:string" minOccurs="0"/>
+              <xs:element name="MA_BAC_SI" type="xs:string" minOccurs="0"/>
+              <xs:element name="MA_BENH" type="xs:string" minOccurs="0"/>
+              <xs:element name="NGAY_YL" type="bhyt:DateTimeType" minOccurs="0"/>
+              <xs:element name="NGAY_TH_YL" type="bhyt:DateTimeType" minOccurs="0"/>
+              <xs:element name="NGAY_KQ" type="bhyt:DateTimeType" minOccurs="0"/>
+              <xs:element name="MA_PTTT" type="xs:string" minOccurs="0"/>
+              <xs:element name="MA_MAYDO" type="xs:string" minOccurs="0"/>
+              <xs:element name="TEN_MAYDO" type="xs:string" minOccurs="0"/>
+              <xs:element name="MA_HIEU" type="xs:string" minOccurs="0"/>
+              <xs:element name="PHAN_LOAI_PTTT" type="xs:string" minOccurs="0"/>
+              <xs:element name="VET_THUONG_TP" type="xs:string" minOccurs="0"/>
+              <xs:element name="PP_VO_CAM" type="xs:string" minOccurs="0"/>
+              <xs:element name="VI_TRI_TH_DVKT" type="xs:string" minOccurs="0"/>
+              <xs:element name="MA_MAY_XN" type="xs:string" minOccurs="0"/>
+              <xs:element name="SO_LUONG_NHAN_VIEN" type="xs:int" minOccurs="0"/>
+              <xs:element name="THOI_GIAN_THUC_HIEN" type="xs:decimal" minOccurs="0"/>
+              <xs:element name="SO_NGAY" type="xs:int" minOccurs="0"/>
+              <xs:element name="SO_LAN" type="xs:int" minOccurs="0"/>
+              <xs:element name="KET_QUA" type="xs:string" minOccurs="0"/>
+              <xs:element name="KET_LUAN" type="xs:string" minOccurs="0"/>
+              <xs:element name="NGUOI_THUC_HIEN" type="xs:string" minOccurs="0"/>
+              <xs:element name="GHI_CHU" type="xs:string" minOccurs="0"/>
+              <xs:element name="NGAY_HIEU_LUC" type="xs:string" minOccurs="0"/>
+              <xs:element name="NGAY_HET_HIEU_LUC" type="xs:string" minOccurs="0"/>
+              <xs:element name="MA_CSKCB" type="xs:string" minOccurs="0"/>
+              <xs:element name="DU_PHONG" type="xs:string" minOccurs="0"/>
+            </xs:sequence>
+          </xs:complexType>
+        </xs:element>
+      </xs:sequence>
+    </xs:complexType>
+  </xs:element>
+
+  <!-- ========================================== -->
+  <!-- XML4 - CHI TIẾT CẬN LÂM SÀNG -->
+  <!-- ========================================== -->
+  
+  <xs:element name="DSACH_CHI_TIET_CLS">
+    <xs:complexType>
+      <xs:sequence>
+        <xs:element name="CHI_TIET_CLS" maxOccurs="unbounded">
+          <xs:complexType>
+            <xs:sequence>
+              <xs:element name="MA_LK" type="xs:string"/>
+              <xs:element name="STT" type="xs:int"/>
+              <xs:element name="MA_DICH_VU" type="xs:string"/>
+              <xs:element name="MA_CHI_SO" type="xs:string"/>
+              <xs:element name="TEN_CHI_SO" type="xs:string"/>
+              <xs:element name="GIA_TRI" type="xs:string"/>
+              <xs:element name="DON_VI_DO" type="xs:string" minOccurs="0"/>
+              <xs:element name="CSBT_THAP" type="xs:string" minOccurs="0"/>
+              <xs:element name="CSBT_CAO" type="xs:string" minOccurs="0"/>
+              <xs:element name="GIA_TRI_MIN" type="xs:string" minOccurs="0"/>
+              <xs:element name="GIA_TRI_MAX" type="xs:string" minOccurs="0"/>
+              <xs:element name="MA_MAY" type="xs:string" minOccurs="0"/>
+              <xs:element name="TEN_MAY" type="xs:string" minOccurs="0"/>
+              <xs:element name="MO_TA" type="xs:string" minOccurs="0"/>
+              <xs:element name="KET_LUAN" type="xs:string" minOccurs="0"/>
+              <xs:element name="NGAY_KQ" type="bhyt:DateTimeType" minOccurs="0"/>
+              <xs:element name="NGUOI_THUC_HIEN" type="xs:string" minOccurs="0"/>
+              <xs:element name="MA_BENH" type="xs:string" minOccurs="0"/>
+              <xs:element name="MA_KHOA" type="xs:string" minOccurs="0"/>
+              <xs:element name="TEN_KHOA" type="xs:string" minOccurs="0"/>
+              <xs:element name="DU_PHONG" type="xs:string" minOccurs="0"/>
+            </xs:sequence>
+          </xs:complexType>
+        </xs:element>
+      </xs:sequence>
+    </xs:complexType>
+  </xs:element>
+
+  <!-- ========================================== -->
+  <!-- XML5 - DIỄN BIẾN LÂM SÀNG -->
+  <!-- ========================================== -->
+  
+  <xs:element name="DSACH_DIEN_BIEN_LAM_SANG">
+    <xs:complexType>
+      <xs:sequence>
+        <xs:element name="DIEN_BIEN_LAM_SANG" maxOccurs="unbounded">
+          <xs:complexType>
+            <xs:sequence>
+              <xs:element name="MA_LK" type="xs:string"/>
+              <xs:element name="STT" type="xs:int"/>
+              <xs:element name="DIEN_BIEN" type="xs:string" minOccurs="0"/>
+              <xs:element name="HOI_CHAN" type="xs:string" minOccurs="0"/>
+              <xs:element name="PHAU_THUAT" type="xs:string" minOccurs="0"/>
+              <xs:element name="NGAY_YL" type="bhyt:DateTimeType" minOccurs="0"/>
+              <xs:element name="NGUOI_THUC_HIEN" type="xs:string" minOccurs="0"/>
+              <xs:element name="DU_PHONG" type="xs:string" minOccurs="0"/>
+              <xs:element name="GHI_CHU" type="xs:string" minOccurs="0"/>
+            </xs:sequence>
+          </xs:complexType>
+        </xs:element>
+      </xs:sequence>
+    </xs:complexType>
+  </xs:element>
+
+  <!-- ========================================== -->
+  <!-- XML6 - HỒ SƠ HIV/AIDS -->
+  <!-- ========================================== -->
+  
+  <xs:element name="HO_SO_HIV_AIDS">
+    <xs:complexType>
+      <xs:sequence>
+        <xs:element name="MA_LK" type="xs:string"/>
+        <xs:element name="MA_BN_HIV" type="xs:string"/>
+        <xs:element name="NGAY_BDDT_ARV" type="bhyt:DateType" minOccurs="0">
+          <xs:annotation>
+            <xs:documentation>Ngày bắt đầu điều trị ARV</xs:documentation>
+          </xs:annotation>
+        </xs:element>
+        <xs:element name="NGAY_DK_DTRI_HIV" type="bhyt:DateType" minOccurs="0"/>
+        <xs:element name="MA_PHAC_DO_DTRI" type="xs:string" minOccurs="0"/>
+        <xs:element name="TEN_PHAC_DO" type="xs:string" minOccurs="0"/>
+        <xs:element name="CD4_TRUOC_DTRI" type="xs:decimal" minOccurs="0"/>
+        <xs:element name="CD4_SAU_6THANG" type="xs:decimal" minOccurs="0"/>
+        <xs:element name="VIRAL_LOAD" type="xs:decimal" minOccurs="0"/>
+        <xs:element name="KET_QUA_DTRI_HIV" type="xs:int" minOccurs="0"/>
+        <xs:element name="NGAY_CHUYEN_PHAC_DO" type="bhyt:DateType" minOccurs="0"/>
+        <xs:element name="LY_DO_CHUYEN" type="xs:string" minOccurs="0"/>
+        <xs:element name="GHI_CHU" type="xs:string" minOccurs="0"/>
+      </xs:sequence>
+    </xs:complexType>
+  </xs:element>
+
+  <!-- ========================================== -->
+  <!-- XML7 - GIẤY RA VIỆN -->
+  <!-- ========================================== -->
+  
+  <xs:element name="GIAY_RA_VIEN">
+    <xs:complexType>
+      <xs:sequence>
+        <xs:element name="MA_LK" type="xs:string"/>
+        <xs:element name="SO_LUU_TRU" type="xs:string" minOccurs="0"/>
+        <xs:element name="SO_GIAY_RA_VIEN" type="xs:string"/>
+        <xs:element name="CHAN_DOAN_RV" type="xs:string"/>
+        <xs:element name="PP_DIEUTRI" type="xs:string" minOccurs="0"/>
+        <xs:element name="TINH_TRANG_RV" type="xs:string"/>
+        <xs:element name="HUONG_DIEU_TRI" type="xs:string" minOccurs="0"/>
+        <xs:element name="NGAY_HEN" type="bhyt:DateType" minOccurs="0"/>
+        <xs:element name="MA_BENH_CHINH" type="xs:string"/>
+        <xs:element name="MA_BENH_KEM" type="xs:string" minOccurs="0"/>
+        <xs:element name="MA_BENH_YHCT" type="xs:string" minOccurs="0"/>
+        <xs:element name="GHI_CHU" type="xs:string" minOccurs="0"/>
+        <xs:element name="BS_DIEU_TRI" type="xs:string" minOccurs="0"/>
+        <xs:element name="NGAY_CT" type="bhyt:DateType">
+          <xs:annotation>
+            <xs:documentation>Ngày chứng từ</xs:documentation>
+          </xs:annotation>
+        </xs:element>
+      </xs:sequence>
+    </xs:complexType>
+  </xs:element>
+
+  <!-- ========================================== -->
+  <!-- XML8 - TÓM TẮT HỒ SƠ BỆNH ÁN -->
+  <!-- ========================================== -->
+  
+  <xs:element name="TOM_TAT_HO_SO_BA">
+    <xs:complexType>
+      <xs:sequence>
+        <xs:element name="MA_LK" type="xs:string"/>
+        <xs:element name="SO_LUU_TRU" type="xs:string"/>
+        <xs:element name="CHAN_DOAN_VAO" type="xs:string" minOccurs="0"/>
+        <xs:element name="CHAN_DOAN_RV" type="xs:string"/>
+        <xs:element name="QT_BENHLY" type="xs:string" minOccurs="0">
+          <xs:annotation>
+            <xs:documentation>Quá trình bệnh lý</xs:documentation>
+          </xs:annotation>
+        </xs:element>
+        <xs:element name="TOMTAT_KQ_CLS" type="xs:string" minOccurs="0">
+          <xs:annotation>
+            <xs:documentation>Tóm tắt kết quả cận lâm sàng</xs:documentation>
+          </xs:annotation>
+        </xs:element>
+        <xs:element name="PP_DIEUTRI" type="xs:string" minOccurs="0"/>
+        <xs:element name="TOMTAT_THUOC" type="xs:string" minOccurs="0"/>
+        <xs:element name="TINH_TRANG_RV" type="xs:string"/>
+        <xs:element name="HUONG_DIEU_TRI" type="xs:string" minOccurs="0"/>
+        <xs:element name="MA_BENH_CHINH" type="xs:string"/>
+        <xs:element name="MA_BENH_KEM" type="xs:string" minOccurs="0"/>
+        <xs:element name="MA_BENH_YHCT" type="xs:string" minOccurs="0"/>
+        <xs:element name="BS_DIEU_TRI" type="xs:string" minOccurs="0"/>
+        <xs:element name="NGAY_CT" type="bhyt:DateType"/>
+      </xs:sequence>
+    </xs:complexType>
+  </xs:element>
+
+  <!-- ========================================== -->
+  <!-- XML9 - GIẤY CHỨNG SINH -->
+  <!-- ========================================== -->
+  
+  <xs:element name="GIAY_CHUNG_SINH">
+    <xs:complexType>
+      <xs:sequence>
+        <xs:element name="MA_LK" type="xs:string"/>
+        <xs:element name="SO_GIAY_CS" type="xs:string"/>
+        <xs:element name="HO_TEN_CHA" type="xs:string" minOccurs="0"/>
+        <xs:element name="HO_TEN_ME" type="xs:string"/>
+        <xs:element name="SO_CCCD_CHA" type="xs:string" minOccurs="0"/>
+        <xs:element name="SO_CCCD_ME" type="xs:string" minOccurs="0"/>
+        <xs:element name="NGAY_SINH_CON" type="bhyt:DateTimeType"/>
+        <xs:element name="GIOI_TINH_CON" type="bhyt:GioiTinhType"/>
+        <xs:element name="CAN_NANG_CON" type="xs:decimal"/>
+        <xs:element name="NOI_SINH" type="xs:string"/>
+        <xs:element name="TINH_TRANG_CON" type="xs:int">
+          <xs:annotation>
+            <xs:documentation>1=Sống, 2=Chết, 3=Chết lưu</xs:documentation>
+          </xs:annotation>
+        </xs:element>
+        <xs:element name="SO_CON" type="xs:int">
+          <xs:annotation>
+            <xs:documentation>Con thứ mấy</xs:documentation>
+          </xs:annotation>
+        </xs:element>
+        <xs:element name="LAN_SINH" type="xs:int">
+          <xs:annotation>
+            <xs:documentation>Lần sinh thứ mấy</xs:documentation>
+          </xs:annotation>
+        </xs:element>
+        <xs:element name="SO_CON_SONG" type="xs:int" minOccurs="0"/>
+        <xs:element name="CAN_NANG_ME" type="xs:decimal" minOccurs="0"/>
+        <xs:element name="NGUOI_DO_DE" type="xs:string" minOccurs="0"/>
+        <xs:element name="NGAY_CAP" type="bhyt:DateType"/>
+        <xs:element name="GHI_CHU" type="xs:string" minOccurs="0"/>
+      </xs:sequence>
+    </xs:complexType>
+  </xs:element>
+
+  <!-- ========================================== -->
+  <!-- XML10 - GIẤY CHỨNG NHẬN NGHỈ DƯỠNG THAI -->
+  <!-- ========================================== -->
+  
+  <xs:element name="GIAY_NGHI_DUONG_THAI">
+    <xs:complexType>
+      <xs:sequence>
+        <xs:element name="MA_LK" type="xs:string"/>
+        <xs:element name="SO_GIAY_NGHI" type="xs:string"/>
+        <xs:element name="HO_TEN" type="xs:string"/>
+        <xs:element name="NGAY_SINH" type="xs:string"/>
+        <xs:element name="SO_CCCD" type="xs:string" minOccurs="0"/>
+        <xs:element name="NOI_LAM_VIEC" type="xs:string"/>
+        <xs:element name="TUOI_THAI" type="xs:int">
+          <xs:annotation>
+            <xs:documentation>Tuổi thai (tuần)</xs:documentation>
+          </xs:annotation>
+        </xs:element>
+        <xs:element name="DU_SINH_CON" type="bhyt:DateType">
+          <xs:annotation>
+            <xs:documentation>Ngày dự sinh con</xs:documentation>
+          </xs:annotation>
+        </xs:element>
+        <xs:element name="TU_NGAY" type="bhyt:DateType">
+          <xs:annotation>
+            <xs:documentation>Nghỉ từ ngày</xs:documentation>
+          </xs:annotation>
+        </xs:element>
+        <xs:element name="DEN_NGAY" type="bhyt:DateType">
+          <xs:annotation>
+            <xs:documentation>Nghỉ đến ngày</xs:documentation>
+          </xs:annotation>
+        </xs:element>
+        <xs:element name="SO_NGAY_NGHI" type="xs:int"/>
+        <xs:element name="CHAN_DOAN" type="xs:string" minOccurs="0"/>
+        <xs:element name="PP_DIEUTRI" type="xs:string" minOccurs="0"/>
+        <xs:element name="MA_BENH" type="xs:string" minOccurs="0"/>
+        <xs:element name="BS_CHI_DINH" type="xs:string" minOccurs="0"/>
+        <xs:element name="NGAY_CAP" type="bhyt:DateType"/>
+        <xs:element name="GHI_CHU" type="xs:string" minOccurs="0"/>
+      </xs:sequence>
+    </xs:complexType>
+  </xs:element>
+
+  <!-- ========================================== -->
+  <!-- XML11 - GIẤY CHỨNG NHẬN NGHỈ VIỆC HƯỞNG BHXH -->
+  <!-- ========================================== -->
+  
+  <xs:element name="GIAY_NGHI_VIEC_HUONG_BHXH">
+    <xs:complexType>
+      <xs:sequence>
+        <xs:element name="MA_LK" type="xs:string"/>
+        <xs:element name="SO_GIAY_NGHI" type="xs:string"/>
+        <xs:element name="HO_TEN" type="xs:string"/>
+        <xs:element name="NGAY_SINH" type="xs:string"/>
+        <xs:element name="SO_CCCD" type="xs:string" minOccurs="0"/>
+        <xs:element name="NOI_LAM_VIEC" type="xs:string"/>
+        <xs:element name="CHAN_DOAN" type="xs:string"/>
+        <xs:element name="MA_BENH" type="xs:string"/>
+        <xs:element name="PP_DIEUTRI" type="xs:string" minOccurs="0"/>
+        <xs:element name="TU_NGAY" type="bhyt:DateType"/>
+        <xs:element name="DEN_NGAY" type="bhyt:DateType"/>
+        <xs:element name="SO_NGAY_NGHI" type="xs:int"/>
+        <xs:element name="LY_DO_NGHI" type="xs:string" minOccurs="0"/>
+        <xs:element name="LOAI_NGHI" type="xs:int">
+          <xs:annotation>
+            <xs:documentation>1=Ốm đau, 2=Thai sản, 3=TNLĐ-BNN, 4=Khác</xs:documentation>
+          </xs:annotation>
+        </xs:element>
+        <xs:element name="BS_CHI_DINH" type="xs:string" minOccurs="0"/>
+        <xs:element name="NGAY_CAP" type="bhyt:DateType"/>
+        <xs:element name="GHI_CHU" type="xs:string" minOccurs="0"/>
+      </xs:sequence>
+    </xs:complexType>
+  </xs:element>
+
+  <!-- ========================================== -->
+  <!-- XML12 - GIÁM ĐỊNH Y KHOA -->
+  <!-- ========================================== -->
+  
+  <xs:element name="GIAM_DINH_Y_KHOA">
+    <xs:complexType>
+      <xs:sequence>
+        <xs:element name="MA_LK" type="xs:string"/>
+        <xs:element name="SO_GIAMDINHYK" type="xs:string"/>
+        <xs:element name="HO_TEN" type="xs:string"/>
+        <xs:element name="NGAY_SINH" type="xs:string"/>
+        <xs:element name="SO_CCCD" type="xs:string" minOccurs="0"/>
+        <xs:element name="GIOI_TINH" type="bhyt:GioiTinhType"/>
+        <xs:element name="NOI_LAM_VIEC" type="xs:string" minOccurs="0"/>
+        <xs:element name="NGAY_GIAMDINHYK" type="bhyt:DateType"/>
+        <xs:element name="MUC_DO_TAT" type="xs:decimal" minOccurs="0">
+          <xs:annotation>
+            <xs:documentation>Mức độ tổn thương cơ thể (%)</xs:documentation>
+          </xs:annotation>
+        </xs:element>
+        <xs:element name="PHAN_LOAI_TAT" type="xs:string" minOccurs="0"/>
+        <xs:element name="CHAN_DOAN" type="xs:string"/>
+        <xs:element name="MA_BENH" type="xs:string"/>
+        <xs:element name="KET_LUAN_GIAMDINHYK" type="xs:string"/>
+        <xs:element name="HOI_DONG_GIAMDINHYK" type="xs:string" minOccurs="0"/>
+        <xs:element name="NGAY_HEN_TAIKHAM" type="bhyt:DateType" minOccurs="0"/>
+        <xs:element name="GHI_CHU" type="xs:string" minOccurs="0"/>
+      </xs:sequence>
+    </xs:complexType>
+  </xs:element>
+
+  <!-- ========================================== -->
+  <!-- XML13 - GIẤY CHUYỂN TUYẾN (Bổ sung QĐ 4750) -->
+  <!-- ========================================== -->
+  
+  <xs:element name="GIAY_CHUYEN_TUYEN">
+    <xs:complexType>
+      <xs:sequence>
+        <xs:element name="MA_LK" type="xs:string"/>
+        <xs:element name="SO_GIAY_CT" type="xs:string"/>
+        <xs:element name="HO_TEN" type="xs:string"/>
+        <xs:element name="NGAY_SINH" type="xs:string"/>
+        <xs:element name="GIOI_TINH" type="bhyt:GioiTinhType"/>
+        <xs:element name="MA_THE" type="bhyt:MaTheType"/>
+        <xs:element name="DIA_CHI" type="xs:string"/>
+        <xs:element name="MA_CSKCB_CHUYEN" type="xs:string">
+          <xs:annotation>
+            <xs:documentation>Mã cơ sở KCB chuyển đi</xs:documentation>
+          </xs:annotation>
+        </xs:element>
+        <xs:element name="MA_CSKCB_NHAN" type="xs:string">
+          <xs:annotation>
+            <xs:documentation>Mã cơ sở KCB chuyển đến</xs:documentation>
+          </xs:annotation>
+        </xs:element>
+        <xs:element name="CHAN_DOAN" type="xs:string"/>
+        <xs:element name="MA_BENH" type="xs:string"/>
+        <xs:element name="PP_DIEUTRI" type="xs:string" minOccurs="0"/>
+        <xs:element name="LY_DO_CHUYEN" type="xs:string"/>
+        <xs:element name="HUONG_DIEU_TRI" type="xs:string" minOccurs="0"/>
+        <xs:element name="PHUONG_TIEN_VC" type="xs:string" minOccurs="0">
+          <xs:annotation>
+            <xs:documentation>Phương tiện vận chuyển</xs:documentation>
+          </xs:annotation>
+        </xs:element>
+        <xs:element name="NGUOI_HO_TONG" type="xs:string" minOccurs="0"/>
+        <xs:element name="BS_CHI_DINH" type="xs:string" minOccurs="0"/>
+        <xs:element name="NGAY_CT" type="bhyt:DateTimeType"/>
+        <xs:element name="GHI_CHU" type="xs:string" minOccurs="0"/>
+      </xs:sequence>
+    </xs:complexType>
+  </xs:element>
+
+  <!-- ========================================== -->
+  <!-- XML14 - GIẤY HẸN KHÁM (Bổ sung) -->
+  <!-- ========================================== -->
+  
+  <xs:element name="GIAY_HEN_KHAM">
+    <xs:complexType>
+      <xs:sequence>
+        <xs:element name="MA_LK" type="xs:string"/>
+        <xs:element name="SO_GIAY_HEN" type="xs:string"/>
+        <xs:element name="HO_TEN" type="xs:string"/>
+        <xs:element name="NGAY_SINH" type="xs:string"/>
+        <xs:element name="MA_THE" type="bhyt:MaTheType" minOccurs="0"/>
+        <xs:element name="CHAN_DOAN" type="xs:string"/>
+        <xs:element name="MA_BENH" type="xs:string"/>
+        <xs:element name="NGAY_HEN" type="bhyt:DateType"/>
+        <xs:element name="KHOA_HEN" type="xs:string" minOccurs="0"/>
+        <xs:element name="BS_HEN" type="xs:string" minOccurs="0"/>
+        <xs:element name="NOI_DUNG_HEN" type="xs:string" minOccurs="0"/>
+        <xs:element name="NGAY_CAP" type="bhyt:DateType"/>
+        <xs:element name="GHI_CHU" type="xs:string" minOccurs="0"/>
+      </xs:sequence>
+    </xs:complexType>
+  </xs:element>
+
+  <!-- ========================================== -->
+  <!-- XML15 - THÔNG TIN BỔ SUNG (Mở rộng) -->
+  <!-- ========================================== -->
+  
+  <xs:element name="THONG_TIN_BO_SUNG">
+    <xs:complexType>
+      <xs:sequence>
+        <xs:element name="MA_LK" type="xs:string"/>
+        <xs:element name="LOAI_THONG_TIN" type="xs:string">
+          <xs:annotation>
+            <xs:documentation>Loại thông tin bổ sung</xs:documentation>
+          </xs:annotation>
+        </xs:element>
+        <xs:element name="NOI_DUNG" type="xs:string"/>
+        <xs:element name="DU_LIEU_MO_RONG" minOccurs="0">
+          <xs:complexType>
+            <xs:sequence>
+              <xs:any processContents="lax" minOccurs="0" maxOccurs="unbounded"/>
+            </xs:sequence>
+          </xs:complexType>
+        </xs:element>
+      </xs:sequence>
+    </xs:complexType>
+  </xs:element>
+
+</xs:schema>
