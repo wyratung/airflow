@@ -57,6 +57,17 @@ RABBITMQ_CONFIG = {
 }
 
 # ============================================
+# API Configuration
+# ============================================
+
+API_CONFIG = {
+    'endpoint': Variable.get('bhyt_api_endpoint', 'https://localhost:44315/api/app/files/test'),
+    'timeout': int(Variable.get('bhyt_api_timeout', '60')),
+    'max_retries': int(Variable.get('bhyt_api_max_retries', '3')),
+    'verify_ssl': Variable.get('bhyt_api_verify_ssl', 'false').lower() == 'true'
+}
+
+# ============================================
 # DAG Configuration
 # ============================================
 
@@ -1198,7 +1209,8 @@ def task_output_json(**context):
         # Step 5: Send JSON to API endpoint
         logger.info("Step 5: Sending JSON to API endpoint...")
         
-        api_endpoint = Variable.get('bhyt_api_endpoint', 'https://localhost:44315/api/app/files/test')
+        api_endpoint = API_CONFIG['endpoint']
+        logger.info(f"API endpoint: {api_endpoint}")
         
         api_response = send_json_to_api(
             endpoint_url=api_endpoint,
@@ -1250,22 +1262,46 @@ def task_output_json(**context):
             logger.warning(f"S3 upload failed (non-critical): {str(s3_error)}")
             output_s3_uri = None
         
-        # Step 7: Delete message from SQS (processing completed)
-        logger.info("Step 7: Deleting message from SQS queue...")
+        # Step 7: Delete message from RabbitMQ queue if API call succeeded
+        logger.info("Step 7: Deleting message from RabbitMQ queue...")
         
-        # receipt_handle = file_metadata.get('sqs_receipt_handle')
-        # if receipt_handle:
-        #     try:
-        #         sqs_hook = SqsHook(aws_conn_id='aws_default')
-        #         queue_url = Variable.get('bhyt_sqs_queue_url')
-                
-        #         sqs_hook.delete_message(
-        #             queue_url=queue_url,
-        #             receipt_handle=receipt_handle
-        #         )
-        #         logger.info("SQS message deleted successfully")
-        #     except Exception as sqs_error:
-        #         logger.warning(f"Failed to delete SQS message: {str(sqs_error)}")
+        rabbitmq_message_deleted = False
+        
+        # Only delete message if API call was successful
+        if api_response['status'] == 'success':
+            delivery_tag = ti.xcom_pull(task_ids='load_from_s3', key='rabbitmq_delivery_tag')
+            
+            if delivery_tag:
+                try:
+                    logger.info(f"API call successful - attempting to delete RabbitMQ message (delivery_tag: {delivery_tag})")
+                    
+                    # Connect to RabbitMQ
+                    rabbitmq_consumer = create_rabbitmq_consumer(RABBITMQ_CONFIG)
+                    rabbitmq_consumer.connect()
+                    
+                    # Acknowledge message (this removes it from queue)
+                    rabbitmq_consumer.acknowledge_message(delivery_tag)
+                    
+                    # IMPORTANT: Close connection properly to ensure ack is sent to server
+                    rabbitmq_consumer.close()
+                    
+                    rabbitmq_message_deleted = True
+                    
+                    # Mark that we've deleted the message so Task 6 won't try again
+                    ti.xcom_push(key='message_already_deleted', value=True)
+                    
+                    logger.info("OK RabbitMQ message deleted successfully after successful API call")
+                    
+                except Exception as rabbitmq_error:
+                    logger.error(f"✗ Failed to delete RabbitMQ message: {str(rabbitmq_error)}")
+                    logger.warning("Message will remain in queue and may be redelivered")
+                    ti.xcom_push(key='message_already_deleted', value=False)
+            else:
+                logger.warning("No delivery_tag found - cannot delete RabbitMQ message")
+        else:
+            logger.warning(f"API call failed with status '{api_response['status']}' - RabbitMQ message will NOT be deleted")
+            logger.info("Message will remain in queue for retry")
+            ti.xcom_push(key='message_already_deleted', value=False)
         
         # Step 8: Push final results to XCom
         logger.info("Step 8: Pushing final results to XCom...")
@@ -1279,6 +1315,7 @@ def task_output_json(**context):
             'processing_status': final_json['processing_status']['overall_status'],
             'api_response': api_response,
             'api_endpoint': api_endpoint,
+            'rabbitmq_message_deleted': rabbitmq_message_deleted,
             'completed_at': datetime.utcnow().isoformat()
         }
         
@@ -1295,6 +1332,7 @@ def task_output_json(**context):
         logger.info("TASK 5: OUTPUT JSON - Completed successfully")
         logger.info(f"Output S3: {output_s3_uri}")
         logger.info(f"API Status: {api_response['status']}")
+        logger.info(f"RabbitMQ Message Deleted: {rabbitmq_message_deleted}")
         logger.info(f"Processing Status: {final_json['processing_status']['overall_status']}")
         logger.info(f"MA_LK: {ma_lk}")
         logger.info("=" * 80)
@@ -1337,6 +1375,16 @@ def task_acknowledge_rabbitmq_message(**context):
         
         # Step 2: Get delivery tag
         logger.info("Step 1: Getting delivery tag from previous task...")
+        
+        # Check if message was already deleted in Task 5
+        message_already_deleted = ti.xcom_pull(task_ids='output_json', key='message_already_deleted')
+        
+        if message_already_deleted:
+            logger.info("Message was already acknowledged in Task 5 (output_json) - skipping")
+            return {
+                'status': 'skipped',
+                'reason': 'message_already_acknowledged_in_task5'
+            }
         
         delivery_tag = ti.xcom_pull(task_ids='load_from_s3', key='rabbitmq_delivery_tag')
         file_metadata = ti.xcom_pull(task_ids='load_from_s3', key='file_metadata')

@@ -1,8 +1,3 @@
-"""
-Complete BHYT Data Transformer - Theo đúng QĐ 4750/QĐ-BYT
-Parse đầy đủ 15 bảng XML với tên CHUẨN từ XSD
-Phiên bản: 3.0 - Updated với tên bảng chính xác
-"""
 
 import xml.etree.ElementTree as ET
 from typing import Dict, Any, List, Optional
@@ -90,7 +85,24 @@ class CompleteBHYTTransformer:
     
     def _parse_single_hoso(self, hoso_elem: ET.Element, hoso_idx: int) -> Dict[str, Any]:
         """Parse 1 HOSO chứa tất cả FILEHOSO"""
-        record = {}
+        # Khởi tạo record với tất cả các key mặc định
+        record = {
+            'TONG_HOP': {},
+            'DSACH_CHI_TIET_THUOC': [],
+            'DSACH_CHI_TIET_DVKT': [],
+            'DSACH_CHI_TIET_CLS': [],
+            'DSACH_CHI_TIET_DIEN_BIEN_BENH': [],
+            'DSACH_HO_SO_HIV_AIDS': [],
+            'GIAY_RA_VIEN': {},
+            'TOM_TAT_HO_SO_BA': {},
+            'GIAY_CHUNG_SINH': {},
+            'GIAY_NGHI_DUONG_THAI': {},
+            'GIAY_NGHI_VIEC_HUONG_BHXH': {},
+            'DSACH_GIAM_DINH_Y_KHOA': [],
+            'DSACH_GIAY_CHUYEN_TUYEN': [],
+            'DSACH_GIAY_HEN_KHAM_LAI': [],
+            'DSACH_THONG_TIN_LAO': []
+        }
         
         filehoso_list = hoso_elem.findall('FILEHOSO')
         self.logger.info(f"  Found {len(filehoso_list)} FILEHOSO")
@@ -129,37 +141,52 @@ class CompleteBHYTTransformer:
             try:
                 nested_root = ET.fromstring(cleaned_xml.encode(self.encoding))
                 
-                # Route to parser
+                # Route to parser with ternary operators for default values
                 if loaihoso == 'XML1':
-                    record['TONG_HOP'] = self._parse_xml1_tonghop(nested_root)
+                    result = self._parse_xml1_tonghop(nested_root)
+                    record['TONG_HOP'] = result if result else {}
                 elif loaihoso == 'XML2':
-                    record['DSACH_CHI_TIET_THUOC'] = self._parse_xml2_thuoc(nested_root)
+                    result = self._parse_xml2_thuoc(nested_root)
+                    record['DSACH_CHI_TIET_THUOC'] = result if result else []
                 elif loaihoso == 'XML3':
-                    record['DSACH_CHI_TIET_DVKT'] = self._parse_xml3_dvkt(nested_root)
+                    result = self._parse_xml3_dvkt(nested_root)
+                    record['DSACH_CHI_TIET_DVKT'] = result if result else []
                 elif loaihoso == 'XML4':
-                    record['DSACH_CHI_TIET_CLS'] = self._parse_xml4_cls(nested_root)
+                    result = self._parse_xml4_cls(nested_root)
+                    record['DSACH_CHI_TIET_CLS'] = result if result else []
                 elif loaihoso == 'XML5':
-                    record['DSACH_CHI_TIET_DIEN_BIEN_BENH'] = self._parse_xml5_dienbienlamsang(nested_root)
+                    result = self._parse_xml5_dienbienlamsang(nested_root)
+                    record['DSACH_CHI_TIET_DIEN_BIEN_BENH'] = result if result else []
                 elif loaihoso == 'XML6':
-                    record['DSACH_HO_SO_HIV_AIDS'] = self._parse_xml6_hivaids(nested_root)
+                    result = self._parse_xml6_hivaids(nested_root)
+                    record['DSACH_HO_SO_HIV_AIDS'] = result if result else []
                 elif loaihoso == 'XML7':
-                    record['GIAY_RA_VIEN'] = self._parse_xml7_giayravien(nested_root)
+                    result = self._parse_xml7_giayravien(nested_root)
+                    record['GIAY_RA_VIEN'] = result if result else {}
                 elif loaihoso == 'XML8':
-                    record['TOM_TAT_HO_SO_BA'] = self._parse_xml8_tomtat(nested_root)
+                    result = self._parse_xml8_tomtat(nested_root)
+                    record['TOM_TAT_HO_SO_BA'] = result if result else {}
                 elif loaihoso == 'XML9':
-                    record['GIAY_CHUNG_SINH'] = self._parse_xml9_chungsinh(nested_root)
+                    result = self._parse_xml9_chungsinh(nested_root)
+                    record['GIAY_CHUNG_SINH'] = result if result else {}
                 elif loaihoso == 'XML10':
-                    record['GIAY_NGHI_DUONG_THAI'] = self._parse_xml10_nghithai(nested_root)
+                    result = self._parse_xml10_nghithai(nested_root)
+                    record['GIAY_NGHI_DUONG_THAI'] = result if result else {}
                 elif loaihoso == 'XML11':
-                    record['GIAY_NGHI_VIEC_HUONG_BHXH'] = self._parse_xml11_nghibhxh(nested_root)
+                    result = self._parse_xml11_nghibhxh(nested_root)
+                    record['GIAY_NGHI_VIEC_HUONG_BHXH'] = result if result else {}
                 elif loaihoso == 'XML12':
-                    record['DSACH_GIAM_DINH_Y_KHOA'] = self._parse_xml12_giamdinh(nested_root)
+                    result = self._parse_xml12_giamdinh(nested_root)
+                    record['DSACH_GIAM_DINH_Y_KHOA'] = result if result else []
                 elif loaihoso == 'XML13':
-                    record['DSACH_GIAY_CHUYEN_TUYEN'] = self._parse_xml13_chuyentuyen(nested_root)
+                    result = self._parse_xml13_chuyentuyen(nested_root)
+                    record['DSACH_GIAY_CHUYEN_TUYEN'] = result if result else []
                 elif loaihoso == 'XML14':
-                    record['DSACH_GIAY_HEN_KHAM_LAI'] = self._parse_xml14_henkham(nested_root)
+                    result = self._parse_xml14_henkham(nested_root)
+                    record['DSACH_GIAY_HEN_KHAM_LAI'] = result if result else []
                 elif loaihoso == 'XML15':
-                    record['DSACH_THONG_TIN_LAO'] = self._parse_xml15_lao(nested_root)
+                    result = self._parse_xml15_lao(nested_root)
+                    record['DSACH_THONG_TIN_LAO'] = result if result else []
                 
                 self.logger.info(f"  ✓ {loaihoso} parsed successfully")
                 
@@ -521,10 +548,10 @@ class CompleteBHYTTransformer:
     # XML7 - GIAY_RA_VIEN (OBJECT)
     # ========================================
     
-    def _parse_xml7_giayravien(self, root: ET.Element) -> Optional[Dict[str, Any]]:
+    def _parse_xml7_giayravien(self, root: ET.Element) -> Dict[str, Any]:
         """XML7: GIAY_RA_VIEN - Giấy ra viện (SINGLE OBJECT)"""
         if root is None:
-            return None
+            return {}
     
         return {
             'MA_LK': self._get_text(root, 'MA_LK'),
@@ -559,10 +586,10 @@ class CompleteBHYTTransformer:
     # XML8 - TOM_TAT_HO_SO_BA (OBJECT)
     # ========================================
     
-    def _parse_xml8_tomtat(self, root: ET.Element) -> Optional[Dict[str, Any]]:
+    def _parse_xml8_tomtat(self, root: ET.Element) -> Dict[str, Any]:
         """XML8: TOM_TAT_HO_SO_BA - Tóm tắt hồ sơ bệnh án (SINGLE OBJECT)"""
         if root is None:
-            return None
+            return {}
         
         return {
             'MA_LK': self._get_text(root, 'MA_LK'),
@@ -593,10 +620,10 @@ class CompleteBHYTTransformer:
     # XML9 - GIAY_CHUNG_SINH (OBJECT)
     # ========================================
     
-    def _parse_xml9_chungsinh(self, root: ET.Element) -> Optional[Dict[str, Any]]:
+    def _parse_xml9_chungsinh(self, root: ET.Element) -> Dict[str, Any]:
         """XML9: GIAY_CHUNG_SINH - Giấy chứng sinh (SINGLE OBJECT)"""
         if root is None:
-            return None
+            return {}
         
         return {
         'MA_LK': self._get_text(root, 'MA_LK'),
@@ -639,10 +666,10 @@ class CompleteBHYTTransformer:
     # XML10 - GIAY_NGHI_DUONG_THAI (OBJECT)
     # ========================================
     
-    def _parse_xml10_nghithai(self, root: ET.Element) -> Optional[Dict[str, Any]]:
+    def _parse_xml10_nghithai(self, root: ET.Element) -> Dict[str, Any]:
         """XML10: GIAY_NGHI_DUONG_THAI - Giấy nghỉ dưỡng thai (SINGLE OBJECT)"""
         if root is None:
-            return None
+            return {}
         
         return {
         'MA_LK': self._get_text(root, 'MA_LK'),
@@ -664,10 +691,10 @@ class CompleteBHYTTransformer:
     # XML11 - GIAY_NGHI_VIEC_HUONG_BHXH (OBJECT)
     # ========================================
     
-    def _parse_xml11_nghibhxh(self, root: ET.Element) -> Optional[Dict[str, Any]]:
+    def _parse_xml11_nghibhxh(self, root: ET.Element) -> Dict[str, Any]:
         """XML11: GIAY_NGHI_VIEC_HUONG_BHXH - Giấy nghỉ việc hưởng BHXH (SINGLE OBJECT)"""
         if root is None:
-            return None
+            return {}
         
         return {
         'MA_LK': self._get_text(root, 'MA_LK'),
