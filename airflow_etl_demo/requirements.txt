@@ -1,5 +1,5 @@
-# Core Airflow
-apache-airflow>=2.7.1
+# Core Airflow (pinned to stable version)
+apache-airflow==2.10.4
 apache-airflow-providers-amazon>=8.0.0
 
 # Message Queue
@@ -21,3 +21,6 @@ python-dateutil>=2.8.2
 
 # Utilities
 python-dotenv>=1.0.0
+
+# Compatibility fix
+structlog>=24.1.0,<25.0.0
