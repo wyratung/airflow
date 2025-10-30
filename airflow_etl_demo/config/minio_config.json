@@ -1,0 +1,32 @@
+{
+  "Minio": {
+    "Endpoint": "192.168.100.17:9000",
+    "AccessKey": "admin",
+    "SecretKey": "12345678",
+    "BucketName": "demokcb-minhvd",
+    "XmlBucketName": "demokcb-minhvd",
+    "XmlFolderPath": "XmlFiles",
+    "UseSSL": false,
+    "CreateBucketIfNotExists": true
+  },
+  "description": "MinIO configuration for BHYT XML processing pipeline",
+  "notes": [
+    "Endpoint: MinIO server address (without http:// prefix)",
+    "AccessKey: MinIO access key (like AWS access key)",
+    "SecretKey: MinIO secret key (like AWS secret key)",
+    "BucketName: Default bucket for storage",
+    "XmlBucketName: Bucket for XML files",
+    "XmlFolderPath: Folder path within bucket for XML files",
+    "UseSSL: Set to true for HTTPS, false for HTTP",
+    "CreateBucketIfNotExists: Auto-create bucket if it doesn't exist"
+  ],
+  "airflow_variables": {
+    "minio_endpoint": "192.168.100.17:9000",
+    "minio_access_key": "admin",
+    "minio_secret_key": "12345678",
+    "minio_bucket_name": "demokcb-minhvd",
+    "minio_xml_bucket_name": "demokcb-minhvd",
+    "minio_xml_folder_path": "XmlFiles",
+    "minio_use_ssl": "false"
+  }
+}

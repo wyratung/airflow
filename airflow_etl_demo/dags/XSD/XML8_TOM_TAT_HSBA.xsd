@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema" elementFormDefault="qualified">
+  <xs:annotation>
+    <xs:documentation>
+      Bảng 8 - Tóm tắt hồ sơ bệnh án (TOM_TAT_HO_SO_BA)
+      QĐ 4750/QĐ-BYT - Single Object
+    </xs:documentation>
+  </xs:annotation>
+  
+  <xs:element name="TOM_TAT_HO_SO_BA">
+    <xs:complexType>
+      <xs:sequence>
+        <xs:element name="MA_LK" type="xs:string"/>
+        <xs:element name="SO_LUU_TRU" type="xs:string" minOccurs="0"/>
+        <xs:element name="MA_YTE" type="xs:string" minOccurs="0"/>
+        <xs:element name="MA_KHOA" type="xs:string" minOccurs="0"/>
+        <xs:element name="MA_KHOA_RV" type="xs:string" minOccurs="0"/>
+        <xs:element name="NGAY_VAO" type="xs:string"/>
+        <xs:element name="NGAY_RA" type="xs:string"/>
+        <xs:element name="CHAN_DOAN_VAO" type="xs:string" minOccurs="0"/>
+        <xs:element name="CHAN_DOAN_RV" type="xs:string" minOccurs="0"/>
+        <xs:element name="MA_BENH_CHINH" type="xs:string"/>
+        <xs:element name="TEN_BENH_CHINH" type="xs:string" minOccurs="0"/>
+        <xs:element name="MA_BENH_KEM" type="xs:string" minOccurs="0"/>
+        <xs:element name="TEN_BENH_KEM" type="xs:string" minOccurs="0"/>
+        <xs:element name="MA_BENH_YHCT" type="xs:string" minOccurs="0"/>
+        <xs:element name="TEN_BENH_YHCT" type="xs:string" minOccurs="0"/>
+        <xs:element name="QT_BENHLY" type="xs:string" minOccurs="0"/>
+        <xs:element name="TOMTAT_KQ_CLS" type="xs:string" minOccurs="0"/>
+        <xs:element name="PHUONG_PHAP_DTRI" type="xs:string" minOccurs="0"/>
+        <xs:element name="PP_DIEUTRI" type="xs:string" minOccurs="0"/>
+        <xs:element name="TEN_DICH_VU_KT" type="xs:string" minOccurs="0"/>
+        <xs:element name="TEN_THUOC_CDDT" type="xs:string" minOccurs="0"/>
+        <xs:element name="TINH_TRANG_RV" type="xs:string" minOccurs="0"/>
+        <xs:element name="HUONG_DIEU_TRI" type="xs:string" minOccurs="0"/>
+        <xs:element name="NGAY_HEN" type="xs:string" minOccurs="0"/>
+        <xs:element name="GHI_CHU" type="xs:string" minOccurs="0"/>
+        <xs:element name="MA_BAC_SI" type="xs:string" minOccurs="0"/>
+        <xs:element name="TEN_BAC_SI" type="xs:string" minOccurs="0"/>
+        <xs:element name="MA_TRUONG_KHOA" type="xs:string" minOccurs="0"/>
+        <xs:element name="TEN_TRUONG_KHOA" type="xs:string" minOccurs="0"/>
+        <xs:element name="NGAY_CT" type="xs:string" minOccurs="0"/>
+        <xs:element name="DU_PHONG" type="xs:string" minOccurs="0"/>
+      </xs:sequence>
+    </xs:complexType>
+  </xs:element>
+</xs:schema>

@@ -1,35 +1,43 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema" elementFormDefault="qualified">
+  <xs:annotation>
+    <xs:documentation>
+      Bảng 4 - Chi tiết dịch vụ cận lâm sàng (DSACH_CHI_TIET_CLS)
+      QĐ 4750/QĐ-BYT
+    </xs:documentation>
+  </xs:annotation>
   
-  <xs:element name="CHITIEU_CHITIET_DICHVUCANLAMSANG">
+  <xs:element name="DSACH_CHI_TIET_CLS">
     <xs:complexType>
       <xs:sequence>
-        <xs:element name="DSACH_CHI_TIET_CLS">
+        <xs:element name="CHI_TIET_CLS" maxOccurs="unbounded">
           <xs:complexType>
             <xs:sequence>
-              <xs:element name="CHI_TIET_CLS" type="ChiTietCLSType" maxOccurs="unbounded"/>
+              <xs:element name="MA_LK" type="xs:string"/>
+              <xs:element name="STT" type="xs:integer"/>
+              <xs:element name="MA_DICH_VU" type="xs:string"/>
+              <xs:element name="MA_CHI_SO" type="xs:string"/>
+              <xs:element name="TEN_CHI_SO" type="xs:string"/>
+              <xs:element name="GIA_TRI" type="xs:string"/>
+              <xs:element name="DON_VI_DO" type="xs:string" minOccurs="0"/>
+              <xs:element name="CSBT_THAP" type="xs:string" minOccurs="0"/>
+              <xs:element name="CSBT_CAO" type="xs:string" minOccurs="0"/>
+              <xs:element name="GIA_TRI_MIN" type="xs:string" minOccurs="0"/>
+              <xs:element name="GIA_TRI_MAX" type="xs:string" minOccurs="0"/>
+              <xs:element name="MA_MAY" type="xs:string" minOccurs="0"/>
+              <xs:element name="TEN_MAY" type="xs:string" minOccurs="0"/>
+              <xs:element name="MO_TA" type="xs:string" minOccurs="0"/>
+              <xs:element name="KET_LUAN" type="xs:string" minOccurs="0"/>
+              <xs:element name="NGAY_KQ" type="xs:string" minOccurs="0"/>
+              <xs:element name="NGUOI_THUC_HIEN" type="xs:string" minOccurs="0"/>
+              <xs:element name="MA_BENH" type="xs:string" minOccurs="0"/>
+              <xs:element name="MA_KHOA" type="xs:string" minOccurs="0"/>
+              <xs:element name="TEN_KHOA" type="xs:string" minOccurs="0"/>
+              <xs:element name="DU_PHONG" type="xs:string" minOccurs="0"/>
             </xs:sequence>
           </xs:complexType>
         </xs:element>
       </xs:sequence>
     </xs:complexType>
   </xs:element>
-
-  <xs:complexType name="ChiTietCLSType">
-    <xs:sequence>
-      <xs:element name="MA_LK" type="xs:string"/>
-      <xs:element name="STT" type="xs:integer"/>
-      <xs:element name="MA_DICH_VU" type="xs:string"/>
-      <xs:element name="MA_CHI_SO" type="xs:string" minOccurs="0"/>
-      <xs:element name="TEN_CHI_SO" type="xs:string" minOccurs="0"/>
-      <xs:element name="GIA_TRI" type="xs:string" minOccurs="0"/>
-      <xs:element name="DON_VI_DO" type="xs:string" minOccurs="0"/>
-      <xs:element name="MO_TA" type="xs:string" minOccurs="0"/>
-      <xs:element name="KET_LUAN" type="xs:string" minOccurs="0"/>
-      <xs:element name="NGAY_KQ" type="xs:string" minOccurs="0"/>
-      <xs:element name="MA_BS_DOC_KQ" type="xs:string" minOccurs="0"/>
-      <xs:element name="DU_PHONG" type="xs:string" minOccurs="0"/>
-    </xs:sequence>
-  </xs:complexType>
-
 </xs:schema>

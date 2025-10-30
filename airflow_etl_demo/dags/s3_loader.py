@@ -1,10 +1,11 @@
 """
-S3 Loader Module - Download và decode XML files từ S3
+S3/MinIO Loader Module - Download và decode XML files từ S3 hoặc MinIO
 Hỗ trợ file được mã hóa base64
 """
 
-# import boto3
-# from botocore.exceptions import ClientError
+import boto3
+from botocore.exceptions import ClientError
+from botocore.client import Config
 import base64
 import gzip
 import zipfile
@@ -15,26 +16,60 @@ from typing import Optional, Dict, Any
 
 class S3FileLoader:
     """
-    Load và decode XML files từ S3 bucket
+    Load và decode XML files từ S3/MinIO bucket
     Hỗ trợ: base64 encoding, gzip compression, zip files
+    Hỗ trợ cả AWS S3 và MinIO
     """
     
-    def __init__(self, aws_access_key: Optional[str] = None, 
+    def __init__(self, 
+                 endpoint_url: Optional[str] = None,
+                 aws_access_key: Optional[str] = None, 
                  aws_secret_key: Optional[str] = None,
-                 region_name: str = 'ap-southeast-1'):
-        self.logger = logging.getLogger(__name__)
+                 region_name: str = 'us-east-1',
+                 use_ssl: bool = True):
+        """
+        Initialize S3/MinIO client
         
-        # Khởi tạo S3 client
-        # if aws_access_key and aws_secret_key:
-        #     self.s3_client = boto3.client(
-        #         's3',
-        #         aws_access_key_id=aws_access_key,
-        #         aws_secret_access_key=aws_secret_key,
-        #         region_name=region_name
-        #     )
-        # else:
-        #     # Sử dụng credentials từ IAM role hoặc env vars
-        #     self.s3_client = boto3.client('s3', region_name=region_name)
+        Args:
+            endpoint_url: MinIO endpoint (e.g., 'http://192.168.100.17:9000')
+            aws_access_key: Access key (MinIO: AccessKey, AWS: access key)
+            aws_secret_key: Secret key (MinIO: SecretKey, AWS: secret key)
+            region_name: Region name (for AWS, ignored for MinIO)
+            use_ssl: Use SSL/TLS connection
+        """
+        self.logger = logging.getLogger(__name__)
+        self.endpoint_url = endpoint_url
+        self.use_ssl = use_ssl
+        
+        # Khởi tạo S3/MinIO client
+        if endpoint_url:
+            # MinIO configuration
+            self.logger.info(f"Initializing MinIO client with endpoint: {endpoint_url}")
+            
+            self.s3_client = boto3.client(
+                's3',
+                endpoint_url=endpoint_url,
+                aws_access_key_id=aws_access_key,
+                aws_secret_access_key=aws_secret_key,
+                config=Config(signature_version='s3v4'),
+                region_name=region_name,
+                use_ssl=use_ssl,
+                verify=False  # Disable SSL verification for self-signed certs
+            )
+        elif aws_access_key and aws_secret_key:
+            # AWS S3 with credentials
+            self.logger.info("Initializing AWS S3 client with credentials")
+            
+            self.s3_client = boto3.client(
+                's3',
+                aws_access_key_id=aws_access_key,
+                aws_secret_access_key=aws_secret_key,
+                region_name=region_name
+            )
+        else:
+            # AWS S3 với IAM role hoặc env vars
+            self.logger.info("Initializing AWS S3 client with default credentials")
+            self.s3_client = boto3.client('s3', region_name=region_name)
     
     def download_and_decode_file(self, bucket_name: str, s3_key: str) -> str:
         """
@@ -62,15 +97,15 @@ class S3FileLoader:
             self.logger.info(f"Successfully decoded to {len(xml_content)} characters")
             return xml_content
             
-        # except ClientError as e:
-        #     error_code = e.response['Error']['Code']
-        #     if error_code == 'NoSuchKey':
-        #         self.logger.error(f"File not found: {s3_key}")
-        #     elif error_code == 'NoSuchBucket':
-        #         self.logger.error(f"Bucket not found: {bucket_name}")
-        #     else:
-        #         self.logger.error(f"S3 error: {str(e)}")
-        #     raise
+        except ClientError as e:
+            error_code = e.response['Error']['Code']
+            if error_code == 'NoSuchKey':
+                self.logger.error(f"File not found: {s3_key}")
+            elif error_code == 'NoSuchBucket':
+                self.logger.error(f"Bucket not found: {bucket_name}")
+            else:
+                self.logger.error(f"S3 error: {str(e)}")
+            raise
         except Exception as e:
             self.logger.error(f"Failed to download/decode file: {str(e)}")
             raise
@@ -297,6 +332,53 @@ class S3FileLoader:
 
 def create_s3_loader(aws_access_key: Optional[str] = None,
                      aws_secret_key: Optional[str] = None,
-                     region_name: str = 'ap-southeast-1') -> S3FileLoader:
-    """Factory function để tạo S3FileLoader"""
-    return S3FileLoader(aws_access_key, aws_secret_key, region_name)
+                     region_name: str = 'us-east-1',
+                     endpoint_url: Optional[str] = None,
+                     use_ssl: bool = True) -> S3FileLoader:
+    """
+    Factory function để tạo S3FileLoader
+    
+    Args:
+        aws_access_key: Access key
+        aws_secret_key: Secret key
+        region_name: Region name
+        endpoint_url: MinIO endpoint URL (e.g., 'http://192.168.100.17:9000')
+        use_ssl: Use SSL/TLS
+    """
+    return S3FileLoader(
+        endpoint_url=endpoint_url,
+        aws_access_key=aws_access_key,
+        aws_secret_key=aws_secret_key,
+        region_name=region_name,
+        use_ssl=use_ssl
+    )
+
+
+def create_minio_loader(endpoint: str, access_key: str, secret_key: str, 
+                        use_ssl: bool = False) -> S3FileLoader:
+    """
+    Factory function để tạo MinIO loader
+    
+    Args:
+        endpoint: MinIO endpoint (e.g., '192.168.100.17:9000')
+        access_key: MinIO access key
+        secret_key: MinIO secret key
+        use_ssl: Use SSL/TLS
+    
+    Returns:
+        S3FileLoader configured for MinIO
+    """
+    # Add http:// or https:// prefix if not present
+    if not endpoint.startswith('http://') and not endpoint.startswith('https://'):
+        protocol = 'https://' if use_ssl else 'http://'
+        endpoint_url = f"{protocol}{endpoint}"
+    else:
+        endpoint_url = endpoint
+    
+    return S3FileLoader(
+        endpoint_url=endpoint_url,
+        aws_access_key=access_key,
+        aws_secret_key=secret_key,
+        region_name='us-east-1',  # MinIO doesn't care about region
+        use_ssl=use_ssl
+    )

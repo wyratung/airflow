@@ -21,10 +21,40 @@ from pathlib import Path
 from lxml import etree
 sys.path.insert(0, '/opt/airflow/plugins/helpers')
 
-from s3_loader import S3FileLoader
+from s3_loader import S3FileLoader, create_minio_loader
 from bhyt_transformer_complete import CompleteBHYTTransformer
+from rabbitmq_consumer import RabbitMQConsumer, create_rabbitmq_consumer
 # from bhyt_validator import CompleteBHYTValidator
 # from external_verifier import ExternalSystemVerifier
+
+# ============================================
+# MinIO Configuration
+# ============================================
+
+MINIO_CONFIG = {
+    'Endpoint': Variable.get('minio_endpoint', '192.168.100.17:9000'),
+    'AccessKey': Variable.get('minio_access_key', 'admin'),
+    'SecretKey': Variable.get('minio_secret_key', '12345678'),
+    'BucketName': Variable.get('minio_bucket_name', 'demokcb-minhvd'),
+    'XmlBucketName': Variable.get('minio_xml_bucket_name', 'demokcb-minhvd'),
+    'XmlFolderPath': Variable.get('minio_xml_folder_path', 'XmlFiles'),
+    'UseSSL': Variable.get('minio_use_ssl', 'false').lower() == 'true',
+    'CreateBucketIfNotExists': True
+}
+
+# ============================================
+# RabbitMQ Configuration
+# ============================================
+
+RABBITMQ_CONFIG = {
+    'host': Variable.get('rabbitmq_host', 'localhost'),
+    'port': int(Variable.get('rabbitmq_port', '5672')),
+    'username': Variable.get('rabbitmq_username', 'guest'),
+    'password': Variable.get('rabbitmq_password', 'guest'),
+    'Exchange': Variable.get('rabbitmq_exchange', 'xml.exchange'),
+    'Queue': Variable.get('rabbitmq_queue', 'xml.queue'),
+    'RoutingKey': Variable.get('rabbitmq_routing_key', 'xml.key')
+}
 
 # ============================================
 # DAG Configuration
@@ -60,9 +90,9 @@ dag = DAG(
 
 def task_load_from_s3(**context):
     """
-    TASK 1: Load file từ S3 và validate XML theo GIAMDINHHS.xsd
+    TASK 1: Get message from RabbitMQ, download file từ S3, và validate XML theo GIAMDINHHS.xsd
     
-    Input: File từ S3 (hoặc local test file)
+    Input: Message từ RabbitMQ (XmlBigSizeMessageQueueDto)
     Output: Raw XML string (đã validate theo XSD)
     """
     logger = logging.getLogger(__name__)
@@ -70,32 +100,92 @@ def task_load_from_s3(**context):
     execution_date = context['execution_date']
     
     logger.info("=" * 80)
-    logger.info(f"TASK 1: LOAD & VALIDATE XSD - Starting at {execution_date}")
+    logger.info(f"TASK 1: LOAD FROM RABBITMQ & S3 - Starting at {execution_date}")
     logger.info("=" * 80)
     
+    rabbitmq_consumer = None
+    message = None
+    
     try:
-        # Step 1: Load XML file
-        logger.info("Step 1: Loading XML file...")
+        # Step 1: Connect to RabbitMQ and get message
+        logger.info("Step 1: Connecting to RabbitMQ...")
         
-        # For testing: Load from local file
-        file_path = Path(__file__).parent / "test.xml"
-        with open(file_path, "rb") as f:
-            file_content = f.read()
+        rabbitmq_consumer = create_rabbitmq_consumer(RABBITMQ_CONFIG)
+        rabbitmq_consumer.connect()
         
-        # Decode content
-        loader = S3FileLoader(
-            aws_access_key="fake",
-            aws_secret_key="fake",
-            region_name="ap-southeast-1"    
+        # Check queue message count
+        message_count = rabbitmq_consumer.get_queue_message_count()
+        logger.info(f"Queue has {message_count} messages")
+        
+        if message_count == 0:
+            logger.warning("No messages in queue - skipping this run")
+            ti.xcom_push(key='skip_run', value=True)
+            return {
+                'status': 'skipped',
+                'reason': 'no_messages_in_queue'
+            }
+        
+        # Get one message from queue (manual ack)
+        logger.info("Getting message from queue...")
+        message = rabbitmq_consumer.get_message(auto_ack=False)
+        
+        if not message:
+            logger.warning("Failed to get message from queue")
+            ti.xcom_push(key='skip_run', value=True)
+            return {
+                'status': 'skipped',
+                'reason': 'failed_to_get_message'
+            }
+        
+        logger.info(f"OK Message received from RabbitMQ")
+        logger.info(f"  Message ID: {message['id']}")
+        logger.info(f"  S3 Path: {message['path']}")
+        logger.info(f"  Delivery Tag: {message['delivery_tag']}")
+        logger.info(f"  Redelivered: {message['redelivered']}")
+        
+        # Step 2: Parse S3 path
+        logger.info("\nStep 2: Parsing S3 path...")
+        logger.info(f"{message}")
+        s3_key = message['path']
+        bucket_name = MINIO_CONFIG['BucketName']
+        # Parse s3://bucket/key format
+        # if s3_path.startswith('s3://'):
+        #     s3_path = s3_path[5:]  # Remove 's3://'
+        
+        # parts = s3_path.split('/', 1)
+        # if len(parts) != 2:
+        #     raise ValueError(f"Invalid S3 path format: {message['path']}")
+        
+        # bucket_name = parts[0]
+        # s3_key = parts[1]
+        
+        logger.info(f"OK S3 Bucket: {bucket_name}")
+        logger.info(f"OK S3 Key: {s3_key}")
+        
+        # Step 3: Download file from MinIO/S3
+        logger.info("\nStep 3: Downloading file from MinIO/S3...")
+        
+        # Initialize MinIO loader
+        logger.info(f"Connecting to MinIO: {MINIO_CONFIG['Endpoint']}")
+        logger.info(f"Bucket: {bucket_name}")
+        logger.info(f"Use SSL: {MINIO_CONFIG['UseSSL']}")
+        
+        loader = create_minio_loader(
+            endpoint=MINIO_CONFIG['Endpoint'],
+            access_key=MINIO_CONFIG['AccessKey'],
+            secret_key=MINIO_CONFIG['SecretKey'],
+            use_ssl=MINIO_CONFIG['UseSSL']
         )
-        xml_content = loader._detect_and_decode(file_content, filename="test.xml")
         
-        logger.info(f"Successfully loaded XML file")
-        logger.info(f"XML content length: {len(xml_content)} characters")
-        logger.info("=" * 80)
-        logger.info(f"{xml_content}")
-        # Step 2: Validate XML theo GIAMDINHHS.xsd
-        logger.info("Step 2: Validating XML against GIAMDINHHS.xsd schema...")
+        # Download and decode file
+        xml_content = loader.download_and_decode_file(bucket_name, s3_key)
+        
+        logger.info(f"OK File downloaded and decoded successfully from MinIO")
+        logger.info(f"OK XML content length: {len(xml_content)} characters")
+        
+        # Step 4: Validate XML theo GIAMDINHHS.xsd
+        # Step 4: Validate XML theo GIAMDINHHS.xsd
+        logger.info("\nStep 4: Validating XML against GIAMDINHHS.xsd schema...")
         
         # Load XSD schema
         xsd_path = Path(__file__).parent / "XSD" / "GIAMDINHHS.xsd"
@@ -107,7 +197,7 @@ def task_load_from_s3(**context):
             xsd_doc = etree.parse(xsd_file)
             xsd_schema = etree.XMLSchema(xsd_doc)
         
-        logger.info(f"✓ XSD schema loaded successfully from {xsd_path}")
+        logger.info(f"OK XSD schema loaded successfully from {xsd_path}")
         
         # Parse XML content
         # Remove BOM if exists
@@ -121,12 +211,19 @@ def task_load_from_s3(**context):
         is_valid = xsd_schema.validate(xml_doc)
         
         if is_valid:
-            logger.info("✓ XML is VALID according to GIAMDINHHS.xsd schema")
+            logger.info("OK XML is VALID according to GIAMDINHHS.xsd schema")
         else:
             logger.error("✗ XML is INVALID according to GIAMDINHHS.xsd schema")
             logger.error("Validation errors:")
             for error in xsd_schema.error_log:
                 logger.error(f"  Line {error.line}: {error.message}")
+            
+            # Reject message and requeue
+            if rabbitmq_consumer and message:
+                rabbitmq_consumer.reject_message(
+                    delivery_tag=message['delivery_tag'],
+                    requeue=False  # Don't requeue invalid XML
+                )
             
             # Raise exception nếu không valid
             error_messages = [f"Line {err.line}: {err.message}" for err in xsd_schema.error_log]
@@ -134,8 +231,9 @@ def task_load_from_s3(**context):
                 f"XML validation failed against GIAMDINHHS.xsd:\n" + "\n".join(error_messages[:5])
             )
         
-        # Step 3: Basic structure check
-        logger.info("Step 3: Performing basic structure check...")
+        # Step 5: Basic structure check
+        # Step 5: Basic structure check
+        logger.info("\nStep 5: Performing basic structure check...")
         
         # Check root element
         if xml_doc.tag != 'GIAMDINHHS':
@@ -145,9 +243,10 @@ def task_load_from_s3(**context):
         thongtindonvi = xml_doc.find('THONGTINDONVI')
         if thongtindonvi is not None:
             ma_lk = thongtindonvi.findtext('MA_LK')
-            logger.info(f"✓ Found MA_LK: {ma_lk}")
+            logger.info(f"OK Found MA_LK: {ma_lk}")
         else:
             logger.warning("THONGTINDONVI element not found")
+            ma_lk = None
         
         # Check THONGTINHOSO
         thongtinhoso = xml_doc.find('THONGTINHOSO')
@@ -156,8 +255,8 @@ def task_load_from_s3(**context):
         
         ngaylap = thongtinhoso.findtext('NGAYLAP')
         soluonghoso = thongtinhoso.findtext('SOLUONGHOSO')
-        logger.info(f"✓ NGAYLAP: {ngaylap}")
-        logger.info(f"✓ SOLUONGHOSO: {soluonghoso}")
+        logger.info(f"OK NGAYLAP: {ngaylap}")
+        logger.info(f"OK SOLUONGHOSO: {soluonghoso}")
         
         # Check DANHSACHHOSO
         danhsachhoso = thongtinhoso.find('DANHSACHHOSO')
@@ -165,7 +264,7 @@ def task_load_from_s3(**context):
             raise ValueError("Missing DANHSACHHOSO element")
         
         hoso_list = danhsachhoso.findall('HOSO')
-        logger.info(f"✓ Found {len(hoso_list)} HOSO elements")
+        logger.info(f"OK Found {len(hoso_list)} HOSO elements")
         
         # Count FILEHOSO in each HOSO
         total_filehoso = 0
@@ -178,25 +277,26 @@ def task_load_from_s3(**context):
             loaihoso_types = [fh.findtext('LOAIHOSO') for fh in filehoso_list]
             logger.info(f"    LOAIHOSO: {', '.join(loaihoso_types)}")
         
-        logger.info(f"✓ Total FILEHOSO elements: {total_filehoso}")
+        logger.info(f"OK Total FILEHOSO elements: {total_filehoso}")
         
-        # Step 4: Push data to XCom
-        logger.info("Step 4: Pushing data to XCom...")
+        # Step 6: Push data to XCom
+        # Step 6: Push data to XCom
+        logger.info("\nStep 6: Pushing data to XCom...")
         
         # Push raw XML content
         ti.xcom_push(key='raw_xml_content', value=xml_content)
         
         # Push metadata
         metadata = {
-            'message_id': 'test-message-id',
-            's3_bucket': 'test-bucket',
-            's3_key': 'test/file.xml',
-            's3_uri': 'test://test-bucket/test/file.xml',
+            'message_id': message['id'],
+            'rabbitmq_delivery_tag': message['delivery_tag'],
+            's3_bucket': bucket_name,
+            's3_key': s3_key,
+            's3_uri': f"s3://{bucket_name}/{s3_key}",
             'file_size': len(xml_content),
-            'sqs_receipt_handle': None,
-            'received_at': datetime.utcnow().isoformat(),
-            'message_attributes': {},
-            'test_mode': True,
+            'received_at': message['received_at'],
+            'redelivered': message['redelivered'],
+            'message_raw': message['message_raw'],
             'xsd_validation': {
                 'schema': 'GIAMDINHHS.xsd',
                 'is_valid': True,
@@ -213,27 +313,56 @@ def task_load_from_s3(**context):
         
         ti.xcom_push(key='file_metadata', value=metadata)
         
+        # DON'T acknowledge message yet - wait until entire pipeline succeeds
+        # Store delivery tag for later acknowledgment
+        ti.xcom_push(key='rabbitmq_delivery_tag', value=message['delivery_tag'])
+        
         logger.info("=" * 80)
-        logger.info("TASK 1: LOAD & VALIDATE XSD - Completed successfully")
-        logger.info(f"✓ XSD Validation: PASSED")
-        logger.info(f"✓ MA_LK: {ma_lk}")
-        logger.info(f"✓ HOSO count: {len(hoso_list)}")
-        logger.info(f"✓ FILEHOSO count: {total_filehoso}")
+        logger.info("TASK 1: LOAD FROM RABBITMQ & S3 - Completed successfully")
+        logger.info(f"OK Message ID: {message['id']}")
+        logger.info(f"OK S3 URI: s3://{bucket_name}/{s3_key}")
+        logger.info(f"OK XSD Validation: PASSED")
+        logger.info(f"OK MA_LK: {ma_lk}")
+        logger.info(f"OK HOSO count: {len(hoso_list)}")
+        logger.info(f"OK FILEHOSO count: {total_filehoso}")
         logger.info("=" * 80)
         
         return {
             'status': 'success',
+            'message_id': message['id'],
             'xsd_validation': 'passed',
             'file_size': len(xml_content),
-            's3_uri': metadata['s3_uri'],
+            's3_uri': f"s3://{bucket_name}/{s3_key}",
             'hoso_count': len(hoso_list),
             'filehoso_count': total_filehoso
         }
         
     except Exception as e:
-        logger.error(f"TASK 1: LOAD & VALIDATE XSD - Failed with error: {str(e)}")
+        logger.error(f"TASK 1: LOAD FROM RABBITMQ & S3 - Failed with error: {str(e)}")
         logger.exception(e)
-        raise AirflowFailException(f"Load and XSD validation task failed: {str(e)}")
+        
+        # Reject message on error (requeue based on error type)
+        if rabbitmq_consumer and message:
+            try:
+                # Don't requeue if it's a validation error or parsing error
+                requeue = not isinstance(e, (ValueError, AirflowFailException))
+                rabbitmq_consumer.reject_message(
+                    delivery_tag=message['delivery_tag'],
+                    requeue=requeue
+                )
+                logger.info(f"Message rejected (requeue={requeue})")
+            except Exception as ack_error:
+                logger.error(f"Failed to reject message: {str(ack_error)}")
+        
+        raise AirflowFailException(f"Load task failed: {str(e)}")
+    
+    finally:
+        # Close RabbitMQ connection
+        if rabbitmq_consumer:
+            try:
+                rabbitmq_consumer.close()
+            except Exception as close_error:
+                logger.warning(f"Failed to close RabbitMQ connection: {str(close_error)}")
 
 
 # ============================================
@@ -276,7 +405,7 @@ def task_validate_xml(**context):
         
         # Parse với lxml
         root = etree.fromstring(xml_content.encode('utf-8'))
-        logger.info(f"✓ Wrapper XML parsed successfully. Root element: {root.tag}")
+        logger.info(f"OK Wrapper XML parsed successfully. Root element: {root.tag}")
         
         # Step 3: Prepare XSD schema directory
         logger.info("Step 3: Preparing XSD schema directory...")
@@ -285,25 +414,27 @@ def task_validate_xml(**context):
         if not xsd_dir.exists():
             raise FileNotFoundError(f"XSD directory not found: {xsd_dir}")
         
-        logger.info(f"✓ XSD directory: {xsd_dir}")
+        logger.info(f"OK XSD directory: {xsd_dir}")
         
         # XSD mapping: LOAIHOSO -> XSD filename
+        # XSD mapping: LOAIHOSO -> XSD filename
+        # Updated to match actual XSD files and transformer structure
         xsd_mapping = {
-            'XML1': 'XML1_TONGHOP.xsd',
-            'XML2': 'XML2_CHITIET_THUOC.xsd',
-            'XML3': 'XML3_CHITIET_DVKT.xsd',
-            'XML4': 'XML4_CHITIET_CLS.xsd',
-            'XML5': 'XML5_DIENBIEN_LS.xsd',
-            'XML6': 'XML6_CSDT_HIVAIDS.xsd',
-            'XML7': 'XML7_DUOC_LUU.xsd',
-            'XML8': 'XML8_CHAN_DOAN_HINH_ANH.xsd',
-            'XML9': 'XML9_PHAU_THUAT_THU_THUAT.xsd',
-            'XML10': 'XML10_TRUYEN_MAU.xsd',
-            'XML11': 'XML11_CHI_SO_SINH_TON.xsd',
-            'XML12': 'XML12_THUOC_UNG_THU.xsd',
-            'XML13': 'XML13_PHUC_HOI_CHUC_NANG.xsd',
-            'XML14': 'XML14_VTYT_THAY_THE.xsd',
-            'XML15': 'XML15_GIAI_PHAU_BENH.xsd'
+            'XML1': 'XML1_TONGHOP.xsd',                    # TONG_HOP (Object)
+            'XML2': 'XML2_CHITIET_THUOC.xsd',              # DSACH_CHI_TIET_THUOC (Array)
+            'XML3': 'XML3_CHITIET_DVKT.xsd',               # DSACH_CHI_TIET_DVKT (Array)
+            'XML4': 'XML4_CHITIET_CLS.xsd',                # DSACH_CHI_TIET_CLS (Array)
+            'XML5': 'XML5_DIENBIEN_LS.xsd',                # DSACH_CHI_TIET_DIEN_BIEN_BENH (Array)
+            'XML6': 'XML6_CSDT_HIVAIDS.xsd',               # DSACH_HO_SO_HIV_AIDS (Array)
+            'XML7': 'XML7_GIAY_RA_VIEN.xsd',               # GIAY_RA_VIEN (Object)
+            'XML8': 'XML8_TOM_TAT_HSBA.xsd',               # TOM_TAT_HO_SO_BA (Object)
+            'XML9': 'XML9_GIAY_CHUNG_SINH.xsd',            # GIAY_CHUNG_SINH (Object)
+            'XML10': 'XML10_GIAY_NGHI_THAI.xsd',           # GIAY_NGHI_DUONG_THAI (Object)
+            'XML11': 'XML11_GIAY_NGHI_BHXH.xsd',           # GIAY_NGHI_VIEC_HUONG_BHXH (Object)
+            'XML12': 'XML12_GIAM_DINH_YK.xsd',             # DSACH_GIAM_DINH_Y_KHOA (Array)
+            'XML13': 'XML13_CHUYEN_TUYEN.xsd',             # DSACH_GIAY_CHUYEN_TUYEN (Array)
+            'XML14': 'XML14_HEN_KHAM.xsd',                 # DSACH_GIAY_HEN_KHAM_LAI (Array)
+            'XML15': 'XML15_LAO.xsd'                       # DSACH_THONG_TIN_LAO (Array)
         }
         
         # Step 4: Process each HOSO and validate nested XML
@@ -366,7 +497,7 @@ def task_validate_xml(**context):
                     if nested_xml.startswith('\ufeff'):
                         nested_xml = nested_xml[1:]
                     
-                    logger.info(f"  ✓ Decoded to {len(nested_xml)} characters")
+                    logger.info(f"  OK Decoded to {len(nested_xml)} characters")
                     
                     # Get corresponding XSD file
                     xsd_filename = xsd_mapping.get(loaihoso)
@@ -390,7 +521,7 @@ def task_validate_xml(**context):
                     # Parse nested XML
                     logger.info(f"  Parsing nested XML...")
                     nested_root = etree.fromstring(nested_xml.encode('utf-8'))
-                    logger.info(f"  ✓ Parsed nested XML: <{nested_root.tag}>")
+                    logger.info(f"  OK Parsed nested XML: <{nested_root.tag}>")
                     
                     # Validate nested XML against XSD
                     logger.info(f"  Validating against {xsd_filename}...")
@@ -400,7 +531,7 @@ def task_validate_xml(**context):
                     
                     if is_valid:
                         total_passed += 1
-                        logger.info(f"  ✓ {loaihoso} validation PASSED")
+                        logger.info(f"  OK {loaihoso} validation PASSED")
                         
                         validation_details.append({
                             'hoso_index': hoso_idx,
@@ -521,7 +652,7 @@ def task_validate_xml(**context):
                                         # Append nested XML as child of NOIDUNGFILE
                                         noidungfile_elem.append(nested_root)
                                         decode_count += 1
-                                        logger.info(f"  ✓ Decoded {loaihoso} in xml_content (as XML child)")
+                                        logger.info(f"  OK Decoded {loaihoso} in xml_content (as XML child)")
                                     except etree.XMLSyntaxError as parse_err:
                                         # If parsing fails, use CDATA section as fallback
                                         logger.warning(f"  ⚠ Cannot parse {loaihoso} as XML, using text: {str(parse_err)}")
@@ -530,7 +661,7 @@ def task_validate_xml(**context):
                                 except Exception as decode_err:
                                     logger.warning(f"  ⚠ Failed to decode {loaihoso}: {str(decode_err)}")
                 
-                logger.info(f"\n✓ Successfully decoded {decode_count} nested XML in xml_content")
+                logger.info(f"\nOK Successfully decoded {decode_count} nested XML in xml_content")
         
         # Convert back to string và gán lại vào xml_content
         xml_content = etree.tostring(root_to_modify, encoding='utf-8', xml_declaration=True).decode('utf-8')
@@ -539,14 +670,11 @@ def task_validate_xml(**context):
         logger.info("\n" + "=" * 80)
         logger.info("VALIDATION SUMMARY")
         logger.info("=" * 80)
-        output_filename = f"rte.json"
-       
-        with open(output_filename, 'w', encoding='utf-8') as f:
-            json.dump(xml_content, f, ensure_ascii=False, indent=2)
+        
         is_valid = len(validation_errors) == 0
         
         logger.info(f"Total nested XML validated: {total_validated}")
-        logger.info(f"✓ Passed: {total_passed}")
+        logger.info(f"OK Passed: {total_passed}")
         logger.info(f"✗ Failed: {total_failed}")
         logger.info(f"⚠ Warnings: {len(validation_warnings)}")
         
@@ -555,7 +683,7 @@ def task_validate_xml(**context):
             for error in validation_errors[:10]:  # Show first 10 errors
                 logger.error(f"  - HOSO #{error['hoso_index']}, {error['loaihoso']}: {error['error_messages'][0] if error['error_messages'] else 'Unknown error'}")
         else:
-            logger.info("\n✓ All nested XML validations PASSED")
+            logger.info("\nOK All nested XML validations PASSED")
         
         if validation_warnings:
             logger.warning(f"\nValidation has {len(validation_warnings)} warnings:")
@@ -587,7 +715,7 @@ def task_validate_xml(**context):
         
         logger.info("=" * 80)
         logger.info(f"TASK 2: VALIDATE NESTED XML - Completed")
-        logger.info(f"Status: {'✓ PASSED' if is_valid else '✗ FAILED'}")
+        logger.info(f"Status: {'OK PASSED' if is_valid else '✗ FAILED'}")
         logger.info(f"Validated: {total_validated}, Passed: {total_passed}, Failed: {total_failed}")
         logger.info("=" * 80)
         
@@ -642,8 +770,18 @@ def task_transform_to_dto(**context):
         # Step 3: Transform XML to DTO
         logger.info("Step 3: Transforming XML to DTO structure...")
         
+        output_filename = f"rte.json"
+       
+        # with open(output_filename, 'w', encoding='utf-8') as f:
+        #     json.dump(xml_content, f, ensure_ascii=False, indent=2)
+        # logger.info(f"{xml_content}")
         dto = transformer.transform_complete_xml(xml_content)
-        logger.info(f"✓ Transformation to DTO completed")
+
+        # output_filename = f"dto.json"
+       
+        # with open(output_filename, 'w', encoding='utf-8') as f:
+        #     json.dump(dto, f, ensure_ascii=False, indent=2)
+        logger.info(f"OK Transformation to DTO completed")
         logger.info(f"{dto}")
         logger.info(f"Transformation completed successfully")
         logger.info(f"DTO resource type: {dto['resourceType']}")
@@ -798,7 +936,7 @@ def task_verify_external_system(**context):
         logger.info(f"Data integrity score: {integrity_score:.1f}%")
         
         for check_name, result in integrity_checks.items():
-            status = "✓" if result else "✗"
+            status = "OK" if result else "✗"
             logger.info(f"  {status} {check_name}: {'PASS' if result else 'FAIL'}")
         
         # Step 3: Verify Patient Identity (MOCK)
@@ -973,6 +1111,8 @@ def task_output_json(**context):
         file_metadata = ti.xcom_pull(task_ids='load_from_s3', key='file_metadata')
         validation_result = ti.xcom_pull(task_ids='validate_xml', key='validation_result')
         dto = ti.xcom_pull(task_ids='transform_to_dto', key='complete_dto')
+
+
         verification_results = ti.xcom_pull(task_ids='verify_external', key='verification_results')
         
         # Step 2: Build final JSON structure
@@ -1058,7 +1198,7 @@ def task_output_json(**context):
         # Step 5: Send JSON to API endpoint
         logger.info("Step 5: Sending JSON to API endpoint...")
         
-        api_endpoint = Variable.get('bhyt_api_endpoint', 'https://localhost:44380/api/app/files/test')
+        api_endpoint = Variable.get('bhyt_api_endpoint', 'https://localhost:44315/api/app/files/test')
         
         api_response = send_json_to_api(
             endpoint_url=api_endpoint,
@@ -1168,6 +1308,91 @@ def task_output_json(**context):
 
 
 # ============================================
+# TASK 6: ACK MESSAGE - Acknowledge RabbitMQ Message
+# ============================================
+
+def task_acknowledge_rabbitmq_message(**context):
+    """
+    TASK 6: Acknowledge RabbitMQ message after successful processing
+    
+    This task runs at the end of the pipeline to confirm message processing
+    """
+    logger = logging.getLogger(__name__)
+    ti = context['task_instance']
+    
+    logger.info("=" * 80)
+    logger.info("TASK 6: ACKNOWLEDGE RABBITMQ MESSAGE - Starting")
+    logger.info("=" * 80)
+    
+    try:
+        # Step 1: Check if run was skipped
+        skip_run = ti.xcom_pull(task_ids='load_from_s3', key='skip_run')
+        
+        if skip_run:
+            logger.info("Run was skipped (no messages) - nothing to acknowledge")
+            return {
+                'status': 'skipped',
+                'reason': 'no_message_to_acknowledge'
+            }
+        
+        # Step 2: Get delivery tag
+        logger.info("Step 1: Getting delivery tag from previous task...")
+        
+        delivery_tag = ti.xcom_pull(task_ids='load_from_s3', key='rabbitmq_delivery_tag')
+        file_metadata = ti.xcom_pull(task_ids='load_from_s3', key='file_metadata')
+        
+        if not delivery_tag:
+            logger.warning("No delivery tag found - message may have already been acknowledged")
+            return {
+                'status': 'warning',
+                'reason': 'no_delivery_tag'
+            }
+        
+        logger.info(f"Delivery tag: {delivery_tag}")
+        logger.info(f"Message ID: {file_metadata.get('message_id')}")
+        
+        # Step 3: Connect to RabbitMQ and acknowledge
+        logger.info("\nStep 2: Connecting to RabbitMQ to acknowledge message...")
+        
+        rabbitmq_consumer = create_rabbitmq_consumer(RABBITMQ_CONFIG)
+        rabbitmq_consumer.connect()
+        
+        # Acknowledge message
+        rabbitmq_consumer.acknowledge_message(delivery_tag)
+        
+        logger.info("OK Message acknowledged successfully")
+        
+        # Close connection
+        rabbitmq_consumer.close()
+        
+        logger.info("=" * 80)
+        logger.info("TASK 6: ACKNOWLEDGE RABBITMQ MESSAGE - Completed")
+        logger.info(f"OK Message ID: {file_metadata.get('message_id')}")
+        logger.info(f"OK Delivery Tag: {delivery_tag}")
+        logger.info("=" * 80)
+        
+        return {
+            'status': 'success',
+            'message_id': file_metadata.get('message_id'),
+            'delivery_tag': delivery_tag,
+            'acknowledged_at': datetime.utcnow().isoformat()
+        }
+        
+    except Exception as e:
+        logger.error(f"TASK 6: ACKNOWLEDGE MESSAGE - Failed with error: {str(e)}")
+        logger.exception(e)
+        logger.warning("Message will remain in queue and may be redelivered")
+        
+        # Don't raise exception - we don't want to fail the entire pipeline
+        # just because we couldn't acknowledge
+        return {
+            'status': 'failed',
+            'error': str(e),
+            'warning': 'Message not acknowledged - will be redelivered'
+        }
+
+
+# ============================================
 # API Helper Functions
 # ============================================
 
@@ -1253,7 +1478,7 @@ def send_json_to_api(endpoint_url: str, json_data: str, ma_lk: str, logger) -> d
             
             # Check if request was successful
             if response.status_code in [200, 201, 202]:
-                logger.info(f"✓ API call successful (status {response.status_code})")
+                logger.info(f"OK API call successful (status {response.status_code})")
                 
                 # Try to parse JSON response
                 try:
@@ -1626,12 +1851,19 @@ task_5_output = PythonOperator(
     dag=dag,
 )
 
+task_6_ack = PythonOperator(
+    task_id='acknowledge_message',
+    python_callable=task_acknowledge_rabbitmq_message,
+    provide_context=True,
+    dag=dag,
+)
+
 
 # ============================================
 # Set Task Dependencies
 # ============================================
 
-task_1_load >> task_2_validate >> task_3_transform >> task_4_verify >> task_5_output
+task_1_load >> task_2_validate >> task_3_transform >> task_4_verify >> task_5_output >> task_6_ack
 
 if __name__ == "__main__":
     dag.test()

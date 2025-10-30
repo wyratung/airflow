@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema" elementFormDefault="qualified">
+  <xs:annotation>
+    <xs:documentation>
+      Bảng 15 - Thông tin bệnh Lao (DSACH_THONG_TIN_LAO)
+      QĐ 4750/QĐ-BYT - Array
+    </xs:documentation>
+  </xs:annotation>
+  
+  <xs:element name="DSACH_THONG_TIN_LAO">
+    <xs:complexType>
+      <xs:sequence>
+        <xs:element name="THONG_TIN_LAO" maxOccurs="unbounded">
+          <xs:complexType>
+            <xs:sequence>
+              <xs:element name="MA_LK" type="xs:string"/>
+              <xs:element name="STT" type="xs:integer"/>
+              <xs:element name="MA_BN_LAO" type="xs:string"/>
+              <xs:element name="SO_THE_LAO" type="xs:string" minOccurs="0"/>
+              <xs:element name="LOAI_BENH_NHAN" type="xs:string" minOccurs="0"/>
+              <xs:element name="NGAY_BAT_DAU_DIEU_TRI" type="xs:string" minOccurs="0"/>
+              <xs:element name="NGAY_KET_THUC_DIEU_TRI" type="xs:string" minOccurs="0"/>
+              <xs:element name="PHAC_DO_DIEU_TRI" type="xs:string" minOccurs="0"/>
+              <xs:element name="LOAI_LAO" type="xs:string" minOccurs="0"/>
+              <xs:element name="VI_TRI_LAO" type="xs:string" minOccurs="0"/>
+              <xs:element name="KET_QUA_DIEU_TRI" type="xs:string" minOccurs="0"/>
+              <xs:element name="NGAY_KET_THUC_PHAC_DO" type="xs:string" minOccurs="0"/>
+              <xs:element name="LOAI_THUOC_LAO" type="xs:string" minOccurs="0"/>
+              <xs:element name="XET_NGHIEM_LAO" type="xs:string" minOccurs="0"/>
+              <xs:element name="KET_QUA_XET_NGHIEM" type="xs:string" minOccurs="0"/>
+              <xs:element name="NGAY_XET_NGHIEM" type="xs:string" minOccurs="0"/>
+              <xs:element name="MA_CSKCB_DT_LAO" type="xs:string" minOccurs="0"/>
+              <xs:element name="TEN_CSKCB_DT_LAO" type="xs:string" minOccurs="0"/>
+              <xs:element name="GHI_CHU" type="xs:string" minOccurs="0"/>
+              <xs:element name="DU_PHONG" type="xs:string" minOccurs="0"/>
+            </xs:sequence>
+          </xs:complexType>
+        </xs:element>
+      </xs:sequence>
+    </xs:complexType>
+  </xs:element>
+</xs:schema>
