@@ -324,9 +324,24 @@ def task_load_from_s3(**context):
         
         ti.xcom_push(key='file_metadata', value=metadata)
         
-        # DON'T acknowledge message yet - wait until entire pipeline succeeds
-        # Store delivery tag for later acknowledgment
-        ti.xcom_push(key='rabbitmq_delivery_tag', value=message['delivery_tag'])
+        # Step 7: Delete message from RabbitMQ queue immediately after successful load
+        logger.info("\nStep 7: Deleting message from RabbitMQ queue...")
+        
+        rabbitmq_message_deleted = False
+        
+        try:
+            logger.info(f"Load successful - attempting to delete RabbitMQ message (delivery_tag: {message['delivery_tag']})")
+            
+            # Acknowledge message (this removes it from queue)
+            rabbitmq_consumer.acknowledge_message(message['delivery_tag'])
+            
+            rabbitmq_message_deleted = True
+            
+            logger.info("OK RabbitMQ message deleted successfully after successful load")
+            
+        except Exception as rabbitmq_error:
+            logger.error(f"✗ Failed to delete RabbitMQ message: {str(rabbitmq_error)}")
+            logger.warning("Message will remain in queue and may be redelivered")
         
         logger.info("=" * 80)
         logger.info("TASK 1: LOAD FROM RABBITMQ & S3 - Completed successfully")
@@ -336,6 +351,7 @@ def task_load_from_s3(**context):
         logger.info(f"OK MA_LK: {ma_lk}")
         logger.info(f"OK HOSO count: {len(hoso_list)}")
         logger.info(f"OK FILEHOSO count: {total_filehoso}")
+        logger.info(f"OK RabbitMQ Message Deleted: {rabbitmq_message_deleted}")
         logger.info("=" * 80)
         
         return {
@@ -345,7 +361,8 @@ def task_load_from_s3(**context):
             'file_size': len(xml_content),
             's3_uri': f"s3://{bucket_name}/{s3_key}",
             'hoso_count': len(hoso_list),
-            'filehoso_count': total_filehoso
+            'filehoso_count': total_filehoso,
+            'rabbitmq_message_deleted': rabbitmq_message_deleted
         }
         
     except Exception as e:
@@ -1262,49 +1279,8 @@ def task_output_json(**context):
             logger.warning(f"S3 upload failed (non-critical): {str(s3_error)}")
             output_s3_uri = None
         
-        # Step 7: Delete message from RabbitMQ queue if API call succeeded
-        logger.info("Step 7: Deleting message from RabbitMQ queue...")
-        
-        rabbitmq_message_deleted = False
-        
-        # Only delete message if API call was successful
-        if api_response['status'] == 'success':
-            delivery_tag = ti.xcom_pull(task_ids='load_from_s3', key='rabbitmq_delivery_tag')
-            
-            if delivery_tag:
-                try:
-                    logger.info(f"API call successful - attempting to delete RabbitMQ message (delivery_tag: {delivery_tag})")
-                    
-                    # Connect to RabbitMQ
-                    rabbitmq_consumer = create_rabbitmq_consumer(RABBITMQ_CONFIG)
-                    rabbitmq_consumer.connect()
-                    
-                    # Acknowledge message (this removes it from queue)
-                    rabbitmq_consumer.acknowledge_message(delivery_tag)
-                    
-                    # IMPORTANT: Close connection properly to ensure ack is sent to server
-                    rabbitmq_consumer.close()
-                    
-                    rabbitmq_message_deleted = True
-                    
-                    # Mark that we've deleted the message so Task 6 won't try again
-                    ti.xcom_push(key='message_already_deleted', value=True)
-                    
-                    logger.info("OK RabbitMQ message deleted successfully after successful API call")
-                    
-                except Exception as rabbitmq_error:
-                    logger.error(f"✗ Failed to delete RabbitMQ message: {str(rabbitmq_error)}")
-                    logger.warning("Message will remain in queue and may be redelivered")
-                    ti.xcom_push(key='message_already_deleted', value=False)
-            else:
-                logger.warning("No delivery_tag found - cannot delete RabbitMQ message")
-        else:
-            logger.warning(f"API call failed with status '{api_response['status']}' - RabbitMQ message will NOT be deleted")
-            logger.info("Message will remain in queue for retry")
-            ti.xcom_push(key='message_already_deleted', value=False)
-        
-        # Step 8: Push final results to XCom
-        logger.info("Step 8: Pushing final results to XCom...")
+        # Step 7: Push final results to XCom
+        logger.info("Step 7: Pushing final results to XCom...")
         
         final_results = {
             'output_s3_uri': output_s3_uri,
@@ -1315,7 +1291,6 @@ def task_output_json(**context):
             'processing_status': final_json['processing_status']['overall_status'],
             'api_response': api_response,
             'api_endpoint': api_endpoint,
-            'rabbitmq_message_deleted': rabbitmq_message_deleted,
             'completed_at': datetime.utcnow().isoformat()
         }
         
@@ -1332,7 +1307,6 @@ def task_output_json(**context):
         logger.info("TASK 5: OUTPUT JSON - Completed successfully")
         logger.info(f"Output S3: {output_s3_uri}")
         logger.info(f"API Status: {api_response['status']}")
-        logger.info(f"RabbitMQ Message Deleted: {rabbitmq_message_deleted}")
         logger.info(f"Processing Status: {final_json['processing_status']['overall_status']}")
         logger.info(f"MA_LK: {ma_lk}")
         logger.info("=" * 80)
@@ -1343,101 +1317,6 @@ def task_output_json(**context):
         logger.error(f"TASK 5: OUTPUT JSON - Failed with error: {str(e)}")
         logger.exception(e)
         raise
-
-
-# ============================================
-# TASK 6: ACK MESSAGE - Acknowledge RabbitMQ Message
-# ============================================
-
-def task_acknowledge_rabbitmq_message(**context):
-    """
-    TASK 6: Acknowledge RabbitMQ message after successful processing
-    
-    This task runs at the end of the pipeline to confirm message processing
-    """
-    logger = logging.getLogger(__name__)
-    ti = context['task_instance']
-    
-    logger.info("=" * 80)
-    logger.info("TASK 6: ACKNOWLEDGE RABBITMQ MESSAGE - Starting")
-    logger.info("=" * 80)
-    
-    try:
-        # Step 1: Check if run was skipped
-        skip_run = ti.xcom_pull(task_ids='load_from_s3', key='skip_run')
-        
-        if skip_run:
-            logger.info("Run was skipped (no messages) - nothing to acknowledge")
-            return {
-                'status': 'skipped',
-                'reason': 'no_message_to_acknowledge'
-            }
-        
-        # Step 2: Get delivery tag
-        logger.info("Step 1: Getting delivery tag from previous task...")
-        
-        # Check if message was already deleted in Task 5
-        message_already_deleted = ti.xcom_pull(task_ids='output_json', key='message_already_deleted')
-        
-        if message_already_deleted:
-            logger.info("Message was already acknowledged in Task 5 (output_json) - skipping")
-            return {
-                'status': 'skipped',
-                'reason': 'message_already_acknowledged_in_task5'
-            }
-        
-        delivery_tag = ti.xcom_pull(task_ids='load_from_s3', key='rabbitmq_delivery_tag')
-        file_metadata = ti.xcom_pull(task_ids='load_from_s3', key='file_metadata')
-        
-        if not delivery_tag:
-            logger.warning("No delivery tag found - message may have already been acknowledged")
-            return {
-                'status': 'warning',
-                'reason': 'no_delivery_tag'
-            }
-        
-        logger.info(f"Delivery tag: {delivery_tag}")
-        logger.info(f"Message ID: {file_metadata.get('message_id')}")
-        
-        # Step 3: Connect to RabbitMQ and acknowledge
-        logger.info("\nStep 2: Connecting to RabbitMQ to acknowledge message...")
-        
-        rabbitmq_consumer = create_rabbitmq_consumer(RABBITMQ_CONFIG)
-        rabbitmq_consumer.connect()
-        
-        # Acknowledge message
-        rabbitmq_consumer.acknowledge_message(delivery_tag)
-        
-        logger.info("OK Message acknowledged successfully")
-        
-        # Close connection
-        rabbitmq_consumer.close()
-        
-        logger.info("=" * 80)
-        logger.info("TASK 6: ACKNOWLEDGE RABBITMQ MESSAGE - Completed")
-        logger.info(f"OK Message ID: {file_metadata.get('message_id')}")
-        logger.info(f"OK Delivery Tag: {delivery_tag}")
-        logger.info("=" * 80)
-        
-        return {
-            'status': 'success',
-            'message_id': file_metadata.get('message_id'),
-            'delivery_tag': delivery_tag,
-            'acknowledged_at': datetime.utcnow().isoformat()
-        }
-        
-    except Exception as e:
-        logger.error(f"TASK 6: ACKNOWLEDGE MESSAGE - Failed with error: {str(e)}")
-        logger.exception(e)
-        logger.warning("Message will remain in queue and may be redelivered")
-        
-        # Don't raise exception - we don't want to fail the entire pipeline
-        # just because we couldn't acknowledge
-        return {
-            'status': 'failed',
-            'error': str(e),
-            'warning': 'Message not acknowledged - will be redelivered'
-        }
 
 
 # ============================================
@@ -1899,19 +1778,12 @@ task_5_output = PythonOperator(
     dag=dag,
 )
 
-task_6_ack = PythonOperator(
-    task_id='acknowledge_message',
-    python_callable=task_acknowledge_rabbitmq_message,
-    provide_context=True,
-    dag=dag,
-)
-
 
 # ============================================
 # Set Task Dependencies
 # ============================================
 
-task_1_load >> task_2_validate >> task_3_transform >> task_4_verify >> task_5_output >> task_6_ack
+task_1_load >> task_2_validate >> task_3_transform >> task_4_verify >> task_5_output
 
 if __name__ == "__main__":
     dag.test()

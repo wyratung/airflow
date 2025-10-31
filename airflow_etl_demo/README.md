@@ -43,7 +43,7 @@ airflow_etl_demo/
 
 ## Requirements
 
-- Python 3.8+
+- Python 3.11.9
 - Apache Airflow 2.7.1+
 - MinIO (S3-compatible storage)
 - RabbitMQ
