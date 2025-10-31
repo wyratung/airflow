@@ -497,19 +497,39 @@ def task_validate_xml(**context):
             filehoso_list = hoso.findall('FILEHOSO')
             logger.info(f"Found {len(filehoso_list)} FILEHOSO in HOSO #{hoso_idx}")
             
+            # Extract MA_LK from XML1 (TONG_HOP) for this HOSO
+            ma_lk_for_hoso = None
+            try:
+                # Find XML1 (TONG_HOP) to get MA_LK
+                for fh in filehoso_list:
+                    if fh.findtext('LOAIHOSO') == 'XML1':
+                        noidung_xml1 = fh.findtext('NOIDUNGFILE', '').strip()
+                        if noidung_xml1:
+                            import base64
+                            decoded_xml1 = base64.b64decode(noidung_xml1).decode('utf-8')
+                            if decoded_xml1.startswith('\ufeff'):
+                                decoded_xml1 = decoded_xml1[1:]
+                            xml1_root = etree.fromstring(decoded_xml1.encode('utf-8'))
+                            ma_lk_for_hoso = xml1_root.findtext('.//MA_LK') or xml1_root.findtext('MA_LK')
+                            break
+            except Exception as e:
+                logger.warning(f"Could not extract MA_LK from HOSO #{hoso_idx}: {str(e)}")
+            
+            logger.info(f"MA_LK for HOSO #{hoso_idx}: {ma_lk_for_hoso or 'N/A'}")
+            
             # Process each FILEHOSO
             for filehoso_idx, filehoso in enumerate(filehoso_list, 1):
                 loaihoso = filehoso.findtext('LOAIHOSO')
                 noidungfile_base64 = filehoso.findtext('NOIDUNGFILE', '').strip()
                 
                 if not loaihoso:
-                    validation_warnings.append(f"HOSO #{hoso_idx}, FILEHOSO #{filehoso_idx}: Missing LOAIHOSO")
+                    validation_warnings.append(f"HOSO #{hoso_idx} (MA_LK: {ma_lk_for_hoso or 'N/A'}), FILEHOSO #{filehoso_idx}: Missing LOAIHOSO")
                     continue
                 
                 logger.info(f"\n  Processing FILEHOSO #{filehoso_idx}: {loaihoso}")
                 
                 if not noidungfile_base64:
-                    validation_warnings.append(f"HOSO #{hoso_idx}, {loaihoso}: Empty NOIDUNGFILE")
+                    validation_warnings.append(f"HOSO #{hoso_idx} (MA_LK: {ma_lk_for_hoso or 'N/A'}), {loaihoso}: Empty NOIDUNGFILE")
                     logger.warning(f"  ⚠ {loaihoso}: Empty NOIDUNGFILE")
                     continue
                 
@@ -530,13 +550,13 @@ def task_validate_xml(**context):
                     # Get corresponding XSD file
                     xsd_filename = xsd_mapping.get(loaihoso)
                     if not xsd_filename:
-                        validation_warnings.append(f"HOSO #{hoso_idx}, {loaihoso}: No XSD mapping found")
+                        validation_warnings.append(f"HOSO #{hoso_idx} (MA_LK: {ma_lk_for_hoso or 'N/A'}), {loaihoso}: No XSD mapping found")
                         logger.warning(f"  ⚠ No XSD mapping for {loaihoso}")
                         continue
                     
                     xsd_path = xsd_dir / xsd_filename
                     if not xsd_path.exists():
-                        validation_warnings.append(f"HOSO #{hoso_idx}, {loaihoso}: XSD file not found ({xsd_filename})")
+                        validation_warnings.append(f"HOSO #{hoso_idx} (MA_LK: {ma_lk_for_hoso or 'N/A'}), {loaihoso}: XSD file not found ({xsd_filename})")
                         logger.warning(f"  ⚠ XSD file not found: {xsd_path}")
                         continue
                     
@@ -563,6 +583,7 @@ def task_validate_xml(**context):
                         
                         validation_details.append({
                             'hoso_index': hoso_idx,
+                            'ma_lk': ma_lk_for_hoso,
                             'filehoso_index': filehoso_idx,
                             'loaihoso': loaihoso,
                             'xsd_file': xsd_filename,
@@ -583,6 +604,7 @@ def task_validate_xml(**context):
                         
                         validation_errors.append({
                             'hoso_index': hoso_idx,
+                            'ma_lk': ma_lk_for_hoso,
                             'filehoso_index': filehoso_idx,
                             'loaihoso': loaihoso,
                             'xsd_file': xsd_filename,
@@ -591,6 +613,7 @@ def task_validate_xml(**context):
                         
                         validation_details.append({
                             'hoso_index': hoso_idx,
+                            'ma_lk': ma_lk_for_hoso,
                             'filehoso_index': filehoso_idx,
                             'loaihoso': loaihoso,
                             'xsd_file': xsd_filename,
@@ -603,6 +626,7 @@ def task_validate_xml(**context):
                 except base64.binascii.Error as decode_error:
                     validation_errors.append({
                         'hoso_index': hoso_idx,
+                        'ma_lk': ma_lk_for_hoso,
                         'filehoso_index': filehoso_idx,
                         'loaihoso': loaihoso,
                         'error_messages': [f"Base64 decode error: {str(decode_error)}"]
@@ -612,6 +636,7 @@ def task_validate_xml(**context):
                 except etree.XMLSyntaxError as parse_error:
                     validation_errors.append({
                         'hoso_index': hoso_idx,
+                        'ma_lk': ma_lk_for_hoso,
                         'filehoso_index': filehoso_idx,
                         'loaihoso': loaihoso,
                         'error_messages': [f"XML parse error: {str(parse_error)}"]
@@ -621,6 +646,7 @@ def task_validate_xml(**context):
                 except Exception as nested_error:
                     validation_errors.append({
                         'hoso_index': hoso_idx,
+                        'ma_lk': ma_lk_for_hoso,
                         'filehoso_index': filehoso_idx,
                         'loaihoso': loaihoso,
                         'error_messages': [f"Unexpected error: {str(nested_error)}"]
@@ -709,7 +735,8 @@ def task_validate_xml(**context):
         if validation_errors:
             logger.error(f"\nValidation FAILED with {len(validation_errors)} errors:")
             for error in validation_errors[:10]:  # Show first 10 errors
-                logger.error(f"  - HOSO #{error['hoso_index']}, {error['loaihoso']}: {error['error_messages'][0] if error['error_messages'] else 'Unknown error'}")
+                ma_lk_info = f", MA_LK: {error.get('ma_lk', 'N/A')}" if error.get('ma_lk') else ''
+                logger.error(f"  - HOSO #{error['hoso_index']}{ma_lk_info}, {error['loaihoso']}: {error['error_messages'][0] if error['error_messages'] else 'Unknown error'}")
         else:
             logger.info("\nOK All nested XML validations PASSED")
         
@@ -1146,59 +1173,64 @@ def task_output_json(**context):
         # Step 2: Build final JSON structure
         logger.info("Step 2: Building final JSON structure...")
         
-        final_json = {
-            # Pipeline metadata
-            'pipeline_metadata': {
-                'pipeline_name': 'bhyt_complete_etl_pipeline_v2',
-                'execution_date': context['execution_date'].isoformat(),
-                'dag_run_id': context['dag_run'].run_id,
-                'task_instance_key': f"{context['dag'].dag_id}.{context['run_id']}",
-                'processed_at': datetime.utcnow().isoformat(),
-                'pipeline_version': '2.0.0'
-            },
-            
-            # Source information
-            'source': {
-                's3_uri': file_metadata.get('s3_uri'),
-                'message_id': file_metadata.get('message_id'),
-                'file_size': file_metadata.get('file_size'),
-                'received_at': file_metadata.get('received_at')
-            },
-            
-            # Validation results
-            'validation': {
-                'status': validation_result.get('validation_status'),
-                'is_valid': validation_result.get('is_valid'),
-                'error_count': validation_result.get('error_count'),
-                'warning_count': validation_result.get('warning_count'),
-                'errors': validation_result.get('errors', []),
-                'warnings': validation_result.get('warnings', [])
-            },
-            
-            # BHYT Data (Complete DTO)
-            'data': dto,
-            
-            # Verification results
-            'verification': verification_results,
-            
-            # Processing status
-            'processing_status': {
-                'overall_status': 'SUCCESS',
-                'load_status': 'completed',
-                'validation_status': validation_result.get('validation_status'),
-                'transform_status': 'completed',
-                'verification_status': verification_results.get('overall_status'),
-                'output_status': 'completed'
-            }
-        }
+        # Determine overall status for each record
+        has_validation_errors = validation_result.get('error_count', 0) > 0
         
-        # Determine overall processing status
-        if not validation_result.get('is_valid'):
-            final_json['processing_status']['overall_status'] = 'VALIDATION_FAILED'
-        elif verification_results.get('overall_status') == 'FAILED':
-            final_json['processing_status']['overall_status'] = 'VERIFICATION_FAILED'
-        elif verification_results.get('overall_status') == 'WARNING':
-            final_json['processing_status']['overall_status'] = 'SUCCESS_WITH_WARNINGS'
+        # Process each record to add status and errors
+        records = dto.get('records', [])
+        processed_data = []
+        
+        for idx, record in enumerate(records):
+            # Find validation errors for this record (hoso_index)
+            record_errors = [
+                err for err in validation_result.get('errors', [])
+                if err.get('hoso_index') == idx + 1
+            ]
+            
+            # Add status and errors to record
+            record_with_status = {
+                'MA_LK': record.get('TONG_HOP', {}).get('MA_LK', ''),
+                'TrangThai': 'Error' if record_errors else 'Success',
+                'Errors': [
+                    {
+                        'LOAIHOSO': err.get('loaihoso'),
+                        'XSD_FILE': err.get('xsd_file'),
+                        'ERROR_MESSAGES': err.get('error_messages', [])
+                    }
+                    for err in record_errors
+                ],
+                'TONG_HOP': record.get('TONG_HOP', {}),
+                'DSACH_CHI_TIET_THUOC': record.get('DSACH_CHI_TIET_THUOC', []),
+                'DSACH_CHI_TIET_DVKT': record.get('DSACH_CHI_TIET_DVKT', []),
+                'DSACH_CHI_TIET_CLS': record.get('DSACH_CHI_TIET_CLS', []),
+                'DSACH_CHI_TIET_DIEN_BIEN_BENH': record.get('DSACH_CHI_TIET_DIEN_BIEN_BENH', []),
+                'DSACH_HO_SO_HIV_AIDS': record.get('DSACH_HO_SO_HIV_AIDS', []),
+                'GIAY_RA_VIEN': record.get('GIAY_RA_VIEN', {}),
+                'TOM_TAT_HO_SO_BA': record.get('TOM_TAT_HO_SO_BA', {}),
+                'GIAY_CHUNG_SINH': record.get('GIAY_CHUNG_SINH', {}),
+                'GIAY_NGHI_DUONG_THAI': record.get('GIAY_NGHI_DUONG_THAI', {}),
+                'GIAY_NGHI_VIEC_HUONG_BHXH': record.get('GIAY_NGHI_VIEC_HUONG_BHXH', {}),
+                'DSACH_GIAM_DINH_Y_KHOA': record.get('DSACH_GIAM_DINH_Y_KHOA', []),
+                'DSACH_GIAY_CHUYEN_TUYEN': record.get('DSACH_GIAY_CHUYEN_TUYEN', []),
+                'DSACH_GIAY_HEN_KHAM_LAI': record.get('DSACH_GIAY_HEN_KHAM_LAI', []),
+                'DSACH_THONG_TIN_LAO': record.get('DSACH_THONG_TIN_LAO', [])
+            }
+            processed_data.append(record_with_status)
+        
+        # Count records with errors
+        records_with_errors = sum(1 for r in processed_data if r['TrangThai'] == 'Error')
+        
+        # Build final JSON with new structure
+        final_json = {
+            'header': {
+                'MACSKCB': dto.get('header', {}).get('MACSKCB', ''),
+                'NGAYLAP': dto.get('header', {}).get('NGAYLAP', ''),
+                'SoLuongHoSo': len(records),
+                'SoLuongHoSoLoi': records_with_errors,
+                'message_id': file_metadata.get('message_id', '')
+            },
+            'data': processed_data
+        }
         
         # Step 3: Generate JSON string
         logger.info("Step 3: Generating JSON string...")
@@ -1207,11 +1239,12 @@ def task_output_json(**context):
         json_size = len(json_string)
         
         logger.info(f"JSON generated successfully. Size: {json_size:,} bytes")
+        logger.info(f"Header: MACSKCB={final_json['header']['MACSKCB']}, Records={final_json['header']['SoLuongHoSo']}, Errors={final_json['header']['SoLuongHoSoLoi']}")
         
         # Step 4: Save JSON to local file (temporary)
         logger.info("Step 4: Saving JSON to local file...")
         
-        ma_lk = dto.get('tonghop', {}).get('MA_LK', 'unknown')
+        ma_lk = processed_data[0].get('MA_LK', 'unknown') if processed_data else 'unknown'
         output_filename = f"bhyt_{ma_lk}_{context['execution_date'].strftime('%Y%m%d_%H%M%S')}.json"
         output_path = f"/tmp/{output_filename}"
         temp_dir = tempfile.gettempdir()
@@ -1288,7 +1321,9 @@ def task_output_json(**context):
             'output_local_path': output_path,
             'json_size': json_size,
             'ma_lk': ma_lk,
-            'processing_status': final_json['processing_status']['overall_status'],
+            'macskcb': final_json['header']['MACSKCB'],
+            'total_records': final_json['header']['SoLuongHoSo'],
+            'records_with_errors': final_json['header']['SoLuongHoSoLoi'],
             'api_response': api_response,
             'api_endpoint': api_endpoint,
             'completed_at': datetime.utcnow().isoformat()
@@ -1307,7 +1342,9 @@ def task_output_json(**context):
         logger.info("TASK 5: OUTPUT JSON - Completed successfully")
         logger.info(f"Output S3: {output_s3_uri}")
         logger.info(f"API Status: {api_response['status']}")
-        logger.info(f"Processing Status: {final_json['processing_status']['overall_status']}")
+        logger.info(f"MACSKCB: {final_json['header']['MACSKCB']}")
+        logger.info(f"Total Records: {final_json['header']['SoLuongHoSo']}")
+        logger.info(f"Records with Errors: {final_json['header']['SoLuongHoSoLoi']}")
         logger.info(f"MA_LK: {ma_lk}")
         logger.info("=" * 80)
         

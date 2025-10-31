@@ -1,44 +1,26 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema" elementFormDefault="qualified">
-  <xs:annotation>
-    <xs:documentation>
-      Bảng 10 - Giấy nghỉ dưỡng thai (GIAY_NGHI_DUONG_THAI)
-      QĐ 4750/QĐ-BYT - Single Object
-    </xs:documentation>
-  </xs:annotation>
-  
-  <xs:element name="GIAY_NGHI_DUONG_THAI">
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema"
+           elementFormDefault="qualified"
+           attributeFormDefault="unqualified">
+
+  <xs:element name="CHI_TIEU_DU_LIEU_GIAY_NGHI_DUONG_THAI">
     <xs:complexType>
-      <xs:sequence>
-        <xs:element name="MA_LK" type="xs:string"/>
-        <xs:element name="SO_GIAY_NGHI" type="xs:string"/>
+      <xs:all>
+        <xs:element name="MA_LK" type="xs:string" minOccurs="0"/>
         <xs:element name="SO_SERI" type="xs:string" minOccurs="0"/>
-        <xs:element name="MA_BHXH" type="xs:string" minOccurs="0"/>
-        <xs:element name="MA_THE_BHYT" type="xs:string" minOccurs="0"/>
-        <xs:element name="HO_TEN" type="xs:string"/>
-        <xs:element name="NGAY_SINH" type="xs:string"/>
-        <xs:element name="SO_CCCD" type="xs:string" minOccurs="0"/>
-        <xs:element name="NOI_LAM_VIEC" type="xs:string"/>
-        <xs:element name="TUOI_THAI" type="xs:integer"/>
-        <xs:element name="DU_SINH_CON" type="xs:string"/>
-        <xs:element name="SO_CON" type="xs:integer" minOccurs="0"/>
-        <xs:element name="PHUONG_PHAP_SINH" type="xs:string" minOccurs="0"/>
-        <xs:element name="CHAN_DOAN" type="xs:string" minOccurs="0"/>
-        <xs:element name="MA_BENH" type="xs:string" minOccurs="0"/>
-        <xs:element name="PP_DIEUTRI" type="xs:string" minOccurs="0"/>
-        <xs:element name="TU_NGAY" type="xs:string"/>
-        <xs:element name="DEN_NGAY" type="xs:string"/>
-        <xs:element name="SO_NGAY_NGHI" type="xs:integer"/>
-        <xs:element name="BS_CHI_DINH" type="xs:string" minOccurs="0"/>
-        <xs:element name="MA_BS_CHI_DINH" type="xs:string" minOccurs="0"/>
+        <xs:element name="SO_CT" type="xs:string" minOccurs="0"/>
+        <xs:element name="SO_NGAY" type="xs:string" minOccurs="0"/>
+        <xs:element name="DON_VI" type="xs:string" minOccurs="0"/>
+        <xs:element name="CHAN_DOAN_RV" type="xs:string" minOccurs="0"/>
+        <xs:element name="TU_NGAY" type="xs:string" minOccurs="0"/>
+        <xs:element name="DEN_NGAY" type="xs:string" minOccurs="0"/>
         <xs:element name="MA_TTDV" type="xs:string" minOccurs="0"/>
-        <xs:element name="NGAY_CAP" type="xs:string"/>
-        <xs:element name="NGAY_CHUNG_TU" type="xs:string" minOccurs="0"/>
-        <xs:element name="SO_NGAY_NGHI_TRUOC_SINH" type="xs:integer" minOccurs="0"/>
-        <xs:element name="SO_NGAY_NGHI_SAU_SINH" type="xs:integer" minOccurs="0"/>
-        <xs:element name="GHI_CHU" type="xs:string" minOccurs="0"/>
+        <xs:element name="TEN_BS" type="xs:string" minOccurs="0"/>
+        <xs:element name="MA_BS" type="xs:string" minOccurs="0"/>
+        <xs:element name="NGAY_CT" type="xs:string" minOccurs="0"/>
         <xs:element name="DU_PHONG" type="xs:string" minOccurs="0"/>
-      </xs:sequence>
+      </xs:all>
     </xs:complexType>
   </xs:element>
+
 </xs:schema>

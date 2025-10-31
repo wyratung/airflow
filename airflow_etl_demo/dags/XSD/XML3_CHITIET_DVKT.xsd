@@ -1,63 +1,70 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema" elementFormDefault="qualified">
-  <xs:annotation>
-    <xs:documentation>
-      Bảng 3 - Chi tiết DVKT và VTYT (DSACH_CHI_TIET_DVKT)
-      QĐ 4750/QĐ-BYT
-    </xs:documentation>
-  </xs:annotation>
-  
-  <xs:element name="DSACH_CHI_TIET_DVKT">
+
+  <xs:element name="CHITIEU_CHITIET_DVKT_VTYT">
     <xs:complexType>
       <xs:sequence>
-        <xs:element name="CHI_TIET_DVKT" maxOccurs="unbounded">
+        <xs:element name="DSACH_CHI_TIET_DVKT">
           <xs:complexType>
             <xs:sequence>
-              <xs:element name="MA_LK" type="xs:string"/>
-              <xs:element name="STT" type="xs:integer"/>
-              <xs:element name="MA_DICH_VU" type="xs:string" minOccurs="0"/>
-              <xs:element name="MA_VAT_TU" type="xs:string" minOccurs="0"/>
-              <xs:element name="MA_NHOM" type="xs:integer"/>
-              <xs:element name="GOI_VTYT" type="xs:string" minOccurs="0"/>
-              <xs:element name="TEN_VAT_TU" type="xs:string" minOccurs="0"/>
-              <xs:element name="TEN_DICH_VU" type="xs:string"/>
-              <xs:element name="DON_VI_TINH" type="xs:string"/>
-              <xs:element name="PHAM_VI" type="xs:integer" minOccurs="0"/>
-              <xs:element name="SO_LUONG" type="xs:decimal"/>
-              <xs:element name="DON_GIA_BV" type="xs:decimal" minOccurs="0"/>
-              <xs:element name="DON_GIA_BH" type="xs:decimal" minOccurs="0"/>
-              <xs:element name="DON_GIA" type="xs:decimal"/>
-              <xs:element name="TYLE_TT_DV" type="xs:decimal" minOccurs="0"/>
-              <xs:element name="TYLE_TT_BH" type="xs:decimal" minOccurs="0"/>
-              <xs:element name="TT_THAU" type="xs:string" minOccurs="0"/>
-              <xs:element name="THANH_TIEN_BV" type="xs:decimal" minOccurs="0"/>
-              <xs:element name="THANH_TIEN_BH" type="xs:decimal" minOccurs="0"/>
-              <xs:element name="THANH_TIEN" type="xs:decimal"/>
-              <xs:element name="T_TRANTT" type="xs:decimal" minOccurs="0"/>
-              <xs:element name="MUC_HUONG" type="xs:integer"/>
-              <xs:element name="T_BHTT" type="xs:decimal"/>
-              <xs:element name="T_BNCCT" type="xs:decimal"/>
-              <xs:element name="T_BNTT" type="xs:decimal"/>
-              <xs:element name="T_NGUONKHAC" type="xs:decimal" minOccurs="0"/>
-              <xs:element name="MA_KHOA" type="xs:string" minOccurs="0"/>
-              <xs:element name="MA_GIUONG" type="xs:string" minOccurs="0"/>
-              <xs:element name="MA_BAC_SI" type="xs:string" minOccurs="0"/>
-              <xs:element name="MA_BENH" type="xs:string" minOccurs="0"/>
-              <xs:element name="NGAY_YL" type="xs:string" minOccurs="0"/>
-              <xs:element name="NGAY_TH_YL" type="xs:string" minOccurs="0"/>
-              <xs:element name="NGAY_KQ" type="xs:string" minOccurs="0"/>
-              <xs:element name="MA_PTTT" type="xs:string" minOccurs="0"/>
-              <xs:element name="VET_THUONG_TP" type="xs:string" minOccurs="0"/>
-              <xs:element name="PP_VO_CAM" type="xs:string" minOccurs="0"/>
-              <xs:element name="VI_TRI_TH_DVKT" type="xs:string" minOccurs="0"/>
-              <xs:element name="MA_MAY_XN" type="xs:string" minOccurs="0"/>
-              <xs:element name="KET_QUA" type="xs:string" minOccurs="0"/>
-              <xs:element name="NGUOI_THUC_HIEN" type="xs:string" minOccurs="0"/>
-              <xs:element name="DU_PHONG" type="xs:string" minOccurs="0"/>
+              <xs:element name="CHI_TIET_DVKT" maxOccurs="unbounded">
+                <xs:complexType>
+                  <xs:all>
+                    <xs:element name="MA_LK" type="xs:string" minOccurs="0"/>
+                    <xs:element name="STT" type="xs:integer" minOccurs="0"/>
+                    <xs:element name="MA_DICH_VU" type="xs:string" minOccurs="0"/>
+                    <xs:element name="MA_PTTT_QT" type="xs:string" minOccurs="0"/>
+                    <xs:element name="MA_VAT_TU" type="xs:string" minOccurs="0"/>
+                    <xs:element name="MA_NHOM" type="xs:string" minOccurs="0"/>
+                    <xs:element name="GOI_VTYT" type="xs:string" minOccurs="0"/>
+                    <xs:element name="TEN_VAT_TU" type="xs:string" minOccurs="0"/>
+                    <xs:element name="TEN_DICH_VU" type="xs:string" minOccurs="0"/>
+                    <xs:element name="MA_XANG_DAU" type="xs:string" minOccurs="0"/>
+                    <xs:element name="DON_VI_TINH" type="xs:string" minOccurs="0"/>
+                    <xs:element name="PHAM_VI" type="xs:string" minOccurs="0"/>
+                    <xs:element name="SO_LUONG" type="xs:decimal" minOccurs="0"/>
+                    <xs:element name="DON_GIA_BV" type="xs:decimal" minOccurs="0"/>
+                    <xs:element name="DON_GIA_BH" type="xs:decimal" minOccurs="0"/>
+                    <xs:element name="TT_THAU" type="xs:string" minOccurs="0"/>
+                    <xs:element name="TYLE_TT_DV" type="xs:decimal" minOccurs="0"/>
+                    <xs:element name="TYLE_TT_BH" type="xs:decimal" minOccurs="0"/>
+                    <xs:element name="THANH_TIEN_BV" type="xs:decimal" minOccurs="0"/>
+                    <xs:element name="THANH_TIEN_BH" type="xs:decimal" minOccurs="0"/>
+                    <xs:element name="T_TRANTT" type="xs:string" minOccurs="0"/>
+                    <xs:element name="MUC_HUONG" type="xs:decimal" minOccurs="0"/>
+                    <xs:element name="T_NGUONKHAC_NSNN" type="xs:decimal" minOccurs="0"/>
+                    <xs:element name="T_NGUONKHAC_VTNN" type="xs:decimal" minOccurs="0"/>
+                    <xs:element name="T_NGUONKHAC_VTTN" type="xs:decimal" minOccurs="0"/>
+                    <xs:element name="T_NGUONKHAC_CL" type="xs:decimal" minOccurs="0"/>
+                    <xs:element name="T_NGUONKHAC" type="xs:decimal" minOccurs="0"/>
+                    <xs:element name="T_BNTT" type="xs:decimal" minOccurs="0"/>
+                    <xs:element name="T_BNCCT" type="xs:decimal" minOccurs="0"/>
+                    <xs:element name="T_BHTT" type="xs:decimal" minOccurs="0"/>
+                    <xs:element name="MA_KHOA" type="xs:string" minOccurs="0"/>
+                    <xs:element name="MA_GIUONG" type="xs:string" minOccurs="0"/>
+                    <xs:element name="MA_BAC_SI" type="xs:string" minOccurs="0"/>
+                    <xs:element name="NGUOI_THUC_HIEN" type="xs:string" minOccurs="0"/>
+                    <xs:element name="MA_BENH" type="xs:string" minOccurs="0"/>
+                    <xs:element name="MA_BENH_YHCT" type="xs:string" minOccurs="0"/>
+                    <xs:element name="NGAY_YL" type="xs:string" minOccurs="0"/>
+                    <xs:element name="NGAY_TH_YL" type="xs:string" minOccurs="0"/>
+                    <xs:element name="NGAY_KQ" type="xs:string" minOccurs="0"/>
+                    <xs:element name="MA_PTTT" type="xs:string" minOccurs="0"/>
+                    <xs:element name="VET_THUONG_TP" type="xs:string" minOccurs="0"/>
+                    <xs:element name="PP_VO_CAM" type="xs:string" minOccurs="0"/>
+                    <xs:element name="VI_TRI_TH_DVKT" type="xs:string" minOccurs="0"/>
+                    <xs:element name="MA_MAY" type="xs:string" minOccurs="0"/>
+                    <xs:element name="MA_HIEU_SP" type="xs:string" minOccurs="0"/>
+                    <xs:element name="TAI_SU_DUNG" type="xs:string" minOccurs="0"/>
+                    <xs:element name="DU_PHONG" type="xs:string" minOccurs="0"/>
+                  </xs:all>
+                </xs:complexType>
+              </xs:element>
             </xs:sequence>
           </xs:complexType>
         </xs:element>
       </xs:sequence>
     </xs:complexType>
   </xs:element>
+
 </xs:schema>

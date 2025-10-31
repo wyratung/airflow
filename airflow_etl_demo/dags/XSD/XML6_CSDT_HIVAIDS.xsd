@@ -1,44 +1,72 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema" elementFormDefault="qualified">
-  <xs:annotation>
-    <xs:documentation>
-      Bảng 6 - Hồ sơ HIV/AIDS (HO_SO_HIV_AIDS)
-      QĐ 4750/QĐ-BYT
-    </xs:documentation>
-  </xs:annotation>
-  
-  <xs:element name="DSACH_HO_SO_HIV_AIDS">
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema"
+           elementFormDefault="qualified"
+           attributeFormDefault="unqualified">
+
+  <xs:element name="CHI_TIEU_HO_SO_BENH_AN_CHAM_SOC_VA_DIEU_TRI_HIV_AIDS">
     <xs:complexType>
       <xs:sequence>
-        <xs:element name="HO_SO_HIV_AIDS" maxOccurs="unbounded">
+        <xs:element name="DSACH_HO_SO_BENH_AN_CHAM_SOC_VA_DIEU_TRI_HIV_AIDS">
           <xs:complexType>
             <xs:sequence>
-              <xs:element name="MA_LK" type="xs:string"/>
-              <xs:element name="STT" type="xs:integer"/>
-              <xs:element name="MA_BN_HIV" type="xs:string"/>
-              <xs:element name="VI_TRI_LAY_MAU" type="xs:string" minOccurs="0"/>
-              <xs:element name="TEN_XET_NGHIEM" type="xs:string" minOccurs="0"/>
-              <xs:element name="MA_XET_NGHIEM" type="xs:string" minOccurs="0"/>
-              <xs:element name="KET_QUA_XET_NGHIEM" type="xs:string" minOccurs="0"/>
-              <xs:element name="NGAY_XET_NGHIEM" type="xs:string" minOccurs="0"/>
-              <xs:element name="LOAI_XET_NGHIEM" type="xs:string" minOccurs="0"/>
-              <xs:element name="LAN_XET_NGHIEM" type="xs:integer" minOccurs="0"/>
-              <xs:element name="NGAY_BDDT_ARV" type="xs:string" minOccurs="0"/>
-              <xs:element name="NGAY_KT_ARV" type="xs:string" minOccurs="0"/>
-              <xs:element name="MA_PHAC_DO_DTRI" type="xs:string" minOccurs="0"/>
-              <xs:element name="TEN_PHAC_DO" type="xs:string" minOccurs="0"/>
-              <xs:element name="NHOM_DTRI" type="xs:string" minOccurs="0"/>
-              <xs:element name="LY_DO_CHUYEN_PHAC_DO" type="xs:string" minOccurs="0"/>
-              <xs:element name="MA_BENH_KEM_HIV" type="xs:string" minOccurs="0"/>
-              <xs:element name="TEN_BENH_KEM_HIV" type="xs:string" minOccurs="0"/>
-              <xs:element name="NGAY_CHUYEN_PHAC_DO" type="xs:string" minOccurs="0"/>
-              <xs:element name="MA_CSKCB_BDDT" type="xs:string" minOccurs="0"/>
-              <xs:element name="MA_CSKCB" type="xs:string" minOccurs="0"/>
-              <xs:element name="DU_PHONG" type="xs:string" minOccurs="0"/>
+              <xs:element name="HO_SO_BENH_AN_CHAM_SOC_VA_DIEU_TRI_HIV_AIDS" maxOccurs="unbounded">
+                <xs:complexType>
+                  <xs:all>
+                    <xs:element name="MA_LK" type="xs:string"/>
+                    <xs:element name="MA_THE_BHYT" type="xs:string"/>
+                    <xs:element name="SO_CCCD" type="xs:string"/>
+                    <xs:element name="NGAY_SINH" type="xs:string"/>
+                    <xs:element name="GIOI_TINH" type="xs:string"/>
+                    <xs:element name="DIA_CHI" type="xs:string"/>
+                    <xs:element name="MATINH_CU_TRU" type="xs:string"/>
+                    <xs:element name="MAHUYEN_CU_TRU" type="xs:string"/>
+                    <xs:element name="MAXA_CU_TRU" type="xs:string"/>
+                    <xs:element name="NGAYKD_HIV" type="xs:string"/>
+                    <xs:element name="NOI_LAY_MAU_XN" type="xs:string"/>
+                    <xs:element name="NOI_XN_KD" type="xs:string"/>
+                    <xs:element name="NOI_BDDT_ARV" type="xs:string"/>
+                    <xs:element name="BDDT_ARV" type="xs:string"/>
+                    <xs:element name="MA_PHAC_DO_DIEU_TRI_BD" type="xs:string"/>
+                    <xs:element name="MA_BAC_PHAC_DO_BD" type="xs:string"/>
+                    <xs:element name="MA_LYDO_DTRI" type="xs:string"/>
+                    <xs:element name="LOAI_DTRI_LAO" type="xs:string"/>
+                    <xs:element name="SANG_LOC_LAO" type="xs:string"/>
+                    <xs:element name="PHACDO_DTRI_LAO" type="xs:string"/>
+                    <xs:element name="NGAYBD_DTRI_LAO" type="xs:string"/>
+                    <xs:element name="NGAYKT_DTRI_LAO" type="xs:string"/>
+                    <xs:element name="KQ_DTRI_LAO" type="xs:string"/>
+                    <xs:element name="MA_LYDO_XNTL_VR" type="xs:string"/>
+                    <xs:element name="NGAY_XN_TLVR" type="xs:string"/>
+                    <xs:element name="KQ_XNTL_VR" type="xs:string"/>
+                    <xs:element name="NGAY_KQ_XN_TLVR" type="xs:string"/>
+                    <xs:element name="MA_LOAI_BN" type="xs:string"/>
+                    <xs:element name="GIAI_DOAN_LAM_SANG" type="xs:string"/>
+                    <xs:element name="NHOM_DOI_TUONG" type="xs:string"/>
+                    <xs:element name="MA_TINH_TRANG_DK" type="xs:string"/>
+                    <xs:element name="LAN_XN_PCR" type="xs:string"/>
+                    <xs:element name="NGAY_XN_PCR" type="xs:string"/>
+                    <xs:element name="NGAY_KQ_XN_PCR" type="xs:string"/>
+                    <xs:element name="MA_KQ_XN_PCR" type="xs:string"/>
+                    <xs:element name="NGAY_NHAN_TT_MANG_THAI" type="xs:string"/>
+                    <xs:element name="NGAY_BAT_DAU_DT_CTX" type="xs:string"/>
+                    <xs:element name="MA_XU_TRI" type="xs:string"/>
+                    <xs:element name="NGAY_BAT_DAU_XU_TRI" type="xs:string"/>
+                    <xs:element name="NGAY_KET_THUC_XU_TRI" type="xs:string"/>
+                    <xs:element name="MA_PHAC_DO_DIEU_TRI" type="xs:string"/>
+                    <xs:element name="MA_BAC_PHAC_DO" type="xs:string"/>
+                    <xs:element name="SO_NGAY_CAP_THUOC_ARV" type="xs:string"/>
+                    <xs:element name="NGAY_CHUYEN_PHAC_DO" type="xs:string"/>
+                    <xs:element name="LY_DO_CHUYEN_PHAC_DO" type="xs:string"/>
+                    <xs:element name="MA_CSKCB" type="xs:string"/>
+                    <xs:element name="DU_PHONG" type="xs:string" minOccurs="0"/>
+                  </xs:all>
+                </xs:complexType>
+              </xs:element>
             </xs:sequence>
           </xs:complexType>
         </xs:element>
       </xs:sequence>
     </xs:complexType>
   </xs:element>
+
 </xs:schema>

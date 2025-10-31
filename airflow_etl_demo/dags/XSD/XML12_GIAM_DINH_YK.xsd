@@ -12,7 +12,7 @@
       <xs:sequence>
         <xs:element name="GIAM_DINH_Y_KHOA" maxOccurs="unbounded">
           <xs:complexType>
-            <xs:sequence>
+            <xs:all>
               <xs:element name="MA_LK" type="xs:string"/>
               <xs:element name="STT" type="xs:integer"/>
               <xs:element name="SO_GIAMDINHYK" type="xs:string"/>
@@ -40,7 +40,7 @@
               <xs:element name="NGAY_CT" type="xs:string" minOccurs="0"/>
               <xs:element name="GHI_CHU" type="xs:string" minOccurs="0"/>
               <xs:element name="DU_PHONG" type="xs:string" minOccurs="0"/>
-            </xs:sequence>
+            </xs:all>
           </xs:complexType>
         </xs:element>
       </xs:sequence>

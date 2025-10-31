@@ -1,47 +1,35 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema" elementFormDefault="qualified">
-  <xs:annotation>
-    <xs:documentation>
-      Bảng 8 - Tóm tắt hồ sơ bệnh án (TOM_TAT_HO_SO_BA)
-      QĐ 4750/QĐ-BYT - Single Object
-    </xs:documentation>
-  </xs:annotation>
-  
-  <xs:element name="TOM_TAT_HO_SO_BA">
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema"
+           elementFormDefault="qualified"
+           attributeFormDefault="unqualified">
+
+  <xs:element name="CHI_TIEU_DU_LIEU_TOM_TAT_HO_SO_BENH_AN">
     <xs:complexType>
-      <xs:sequence>
+      <xs:all>
         <xs:element name="MA_LK" type="xs:string"/>
-        <xs:element name="SO_LUU_TRU" type="xs:string" minOccurs="0"/>
-        <xs:element name="MA_YTE" type="xs:string" minOccurs="0"/>
-        <xs:element name="MA_KHOA" type="xs:string" minOccurs="0"/>
-        <xs:element name="MA_KHOA_RV" type="xs:string" minOccurs="0"/>
+        <xs:element name="MA_LOAI_KCB" type="xs:string"/>
+        <xs:element name="HO_TEN_CHA" type="xs:string"/>
+        <xs:element name="HO_TEN_ME" type="xs:string"/>
+        <xs:element name="NGUOI_GIAM_HO" type="xs:string"/>
+        <xs:element name="DON_VI" type="xs:string"/>
         <xs:element name="NGAY_VAO" type="xs:string"/>
         <xs:element name="NGAY_RA" type="xs:string"/>
-        <xs:element name="CHAN_DOAN_VAO" type="xs:string" minOccurs="0"/>
-        <xs:element name="CHAN_DOAN_RV" type="xs:string" minOccurs="0"/>
-        <xs:element name="MA_BENH_CHINH" type="xs:string"/>
-        <xs:element name="TEN_BENH_CHINH" type="xs:string" minOccurs="0"/>
-        <xs:element name="MA_BENH_KEM" type="xs:string" minOccurs="0"/>
-        <xs:element name="TEN_BENH_KEM" type="xs:string" minOccurs="0"/>
-        <xs:element name="MA_BENH_YHCT" type="xs:string" minOccurs="0"/>
-        <xs:element name="TEN_BENH_YHCT" type="xs:string" minOccurs="0"/>
-        <xs:element name="QT_BENHLY" type="xs:string" minOccurs="0"/>
-        <xs:element name="TOMTAT_KQ_CLS" type="xs:string" minOccurs="0"/>
-        <xs:element name="PHUONG_PHAP_DTRI" type="xs:string" minOccurs="0"/>
-        <xs:element name="PP_DIEUTRI" type="xs:string" minOccurs="0"/>
-        <xs:element name="TEN_DICH_VU_KT" type="xs:string" minOccurs="0"/>
-        <xs:element name="TEN_THUOC_CDDT" type="xs:string" minOccurs="0"/>
-        <xs:element name="TINH_TRANG_RV" type="xs:string" minOccurs="0"/>
-        <xs:element name="HUONG_DIEU_TRI" type="xs:string" minOccurs="0"/>
-        <xs:element name="NGAY_HEN" type="xs:string" minOccurs="0"/>
-        <xs:element name="GHI_CHU" type="xs:string" minOccurs="0"/>
-        <xs:element name="MA_BAC_SI" type="xs:string" minOccurs="0"/>
-        <xs:element name="TEN_BAC_SI" type="xs:string" minOccurs="0"/>
-        <xs:element name="MA_TRUONG_KHOA" type="xs:string" minOccurs="0"/>
-        <xs:element name="TEN_TRUONG_KHOA" type="xs:string" minOccurs="0"/>
-        <xs:element name="NGAY_CT" type="xs:string" minOccurs="0"/>
+        <xs:element name="CHAN_DOAN_VAO" type="xs:string"/>
+        <xs:element name="CHAN_DOAN_RV" type="xs:string"/>
+        <xs:element name="QT_BENHLY" type="xs:string"/>
+        <xs:element name="TOMTAT_KQ" type="xs:string"/>
+        <xs:element name="PP_DIEUTRI" type="xs:string"/>
+        <xs:element name="NGAY_SINHCON" type="xs:string"/>
+        <xs:element name="NGAY_CONCHET" type="xs:string"/>
+        <xs:element name="SO_CONCHET" type="xs:string"/>
+        <xs:element name="KET_QUA_DTRI" type="xs:string"/>
+        <xs:element name="GHI_CHU" type="xs:string"/>
+        <xs:element name="MA_TTDV" type="xs:string"/>
+        <xs:element name="NGAY_CT" type="xs:string"/>
+        <xs:element name="MA_THE_TAM" type="xs:string"/>
         <xs:element name="DU_PHONG" type="xs:string" minOccurs="0"/>
-      </xs:sequence>
+      </xs:all>
     </xs:complexType>
   </xs:element>
+
 </xs:schema>

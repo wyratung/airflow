@@ -1,48 +1,60 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema" elementFormDefault="qualified">
-  <xs:annotation>
-    <xs:documentation>
-      Bảng 9 - Giấy chứng sinh (GIAY_CHUNG_SINH)
-      QĐ 4750/QĐ-BYT - Single Object
-    </xs:documentation>
-  </xs:annotation>
-  
-  <xs:element name="GIAY_CHUNG_SINH">
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema"
+           elementFormDefault="qualified"
+           attributeFormDefault="unqualified">
+
+  <xs:element name="CHI_TIEU_DU_LIEU_GIAY_CHUNG_SINH">
     <xs:complexType>
       <xs:sequence>
-        <xs:element name="MA_LK" type="xs:string"/>
-        <xs:element name="SO_GIAY_CS" type="xs:string"/>
-        <xs:element name="SO_LUU_TRU" type="xs:string" minOccurs="0"/>
-        <xs:element name="SO_SERI" type="xs:string" minOccurs="0"/>
-        <xs:element name="SO_CHUNG_SINH" type="xs:string" minOccurs="0"/>
-        <xs:element name="HO_TEN_CHA" type="xs:string" minOccurs="0"/>
-        <xs:element name="HO_TEN_ME" type="xs:string"/>
-        <xs:element name="MA_THE_TAM" type="xs:string" minOccurs="0"/>
-        <xs:element name="SO_CCCD_CHA" type="xs:string" minOccurs="0"/>
-        <xs:element name="SO_CCCD_ME" type="xs:string" minOccurs="0"/>
-        <xs:element name="NGAY_SINH_CON" type="xs:string"/>
-        <xs:element name="GIO_SINH_CON" type="xs:string" minOccurs="0"/>
-        <xs:element name="GIOI_TINH_CON" type="xs:integer"/>
-        <xs:element name="CAN_NANG_CON" type="xs:decimal"/>
-        <xs:element name="NOI_SINH" type="xs:string"/>
-        <xs:element name="MA_NOI_SINH" type="xs:string" minOccurs="0"/>
-        <xs:element name="TINH_TRANG_CON" type="xs:integer"/>
-        <xs:element name="SO_CON" type="xs:integer"/>
-        <xs:element name="LAN_SINH" type="xs:integer"/>
-        <xs:element name="SO_CON_SONG" type="xs:integer" minOccurs="0"/>
-        <xs:element name="CAN_NANG_ME" type="xs:decimal" minOccurs="0"/>
-        <xs:element name="NGUOI_DO_DE" type="xs:string" minOccurs="0"/>
-        <xs:element name="MA_NGUOI_DO_DE" type="xs:string" minOccurs="0"/>
-        <xs:element name="CHUC_DANH_NGUOI_DO_DE" type="xs:string" minOccurs="0"/>
-        <xs:element name="NGAY_CAP" type="xs:string"/>
-        <xs:element name="NOI_CAP" type="xs:string" minOccurs="0"/>
-        <xs:element name="NGUOI_CAP_GIAY" type="xs:string" minOccurs="0"/>
-        <xs:element name="NGUOI_GHI" type="xs:string" minOccurs="0"/>
-        <xs:element name="SO_NGAY_NGHI" type="xs:integer" minOccurs="0"/>
-        <xs:element name="NGOAI_TRU" type="xs:integer" minOccurs="0"/>
-        <xs:element name="GHI_CHU" type="xs:string" minOccurs="0"/>
-        <xs:element name="DU_PHONG" type="xs:string" minOccurs="0"/>
+        <xs:element name="DSACH_GIAYCHUNGSINH">
+          <xs:complexType>
+            <xs:sequence>
+              <xs:element name="DU_LIEU_GIAY_CHUNG_SINH" maxOccurs="unbounded">
+                <xs:complexType>
+                  <xs:all>
+                    <xs:element name="MA_LK" type="xs:string"/>
+                    <xs:element name="MA_BHXH_NND" type="xs:string"/>
+                    <xs:element name="MA_THE_NND" type="xs:string"/>
+                    <xs:element name="HO_TEN_NND" type="xs:string"/>
+                    <xs:element name="NGAYSINH_NND" type="xs:string"/>
+                    <xs:element name="MA_DANTOC_NND" type="xs:string"/>
+                    <xs:element name="SO_CCCD_NND" type="xs:string"/>
+                    <xs:element name="NGAYCAP_CCCD_NND" type="xs:string"/>
+                    <xs:element name="NOICAP_CCCD_NND" type="xs:string"/>
+                    <xs:element name="NOI_CU_TRU_NND" type="xs:string"/>
+                    <xs:element name="MA_QUOCTICH" type="xs:string"/>
+                    <xs:element name="MATINH_CU_TRU" type="xs:string"/>
+                    <xs:element name="MAHUYEN_CU_TRU" type="xs:string"/>
+                    <xs:element name="MAXA_CU_TRU" type="xs:string"/>
+                    <xs:element name="HO_TEN_CHA" type="xs:string"/>
+                    <xs:element name="MA_THE_TAM" type="xs:string"/>
+                    <xs:element name="HO_TEN_CON" type="xs:string"/>
+                    <xs:element name="GIOI_TINH_CON" type="xs:string"/>
+                    <xs:element name="SO_CON" type="xs:string"/>
+                    <xs:element name="LAN_SINH" type="xs:string"/>
+                    <xs:element name="SO_CON_SONG" type="xs:string"/>
+                    <xs:element name="CAN_NANG_CON" type="xs:string"/>
+                    <xs:element name="NGAY_SINH_CON" type="xs:string"/>
+                    <xs:element name="NOI_SINH_CON" type="xs:string"/>
+                    <xs:element name="TINH_TRANG_CON" type="xs:string"/>
+                    <xs:element name="SINHCON_PHAUTHUAT" type="xs:string"/>
+                    <xs:element name="SINHCON_DUOI32TUAN" type="xs:string"/>
+                    <xs:element name="GHI_CHU" type="xs:string"/>
+                    <xs:element name="NGUOI_DO_DE" type="xs:string"/>
+                    <xs:element name="NGUOI_GHI_PHIEU" type="xs:string"/>
+                    <xs:element name="NGAY_CT" type="xs:string"/>
+                    <xs:element name="SO" type="xs:string"/>
+                    <xs:element name="QUYEN_SO" type="xs:string"/>
+                    <xs:element name="MA_TTDV" type="xs:string"/>
+                    <xs:element name="DU_PHONG" type="xs:string" minOccurs="0"/>
+                  </xs:all>
+                </xs:complexType>
+              </xs:element>
+            </xs:sequence>
+          </xs:complexType>
+        </xs:element>
       </xs:sequence>
     </xs:complexType>
   </xs:element>
+
 </xs:schema>
